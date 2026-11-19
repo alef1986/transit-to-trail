@@ -4,7 +4,7 @@ import { RAIL_CORRIDORS } from './data/railLines.js';
 import { REGION_PRESETS } from './data/presets.js';
 import { STAKEHOLDERS, EFFORT_STYLE } from './data/stakeholders.js';
 import { I18N } from './i18n.js';
-import { fetchBRouterAlternatives, haversineKm, formatDuration } from './services/brouter.js';
+import { fetchBRouterAlternatives, fetchBRouterLoops, haversineKm, formatDuration } from './services/brouter.js';
 import { fetchCorridorTrails, fetchTrailGeometry, pickSteerPoint } from './services/waymarked.js';
 import { downloadRouteGpx } from './utils/gpx.js';
 import { buildElevationSeries, buildSvgPaths } from './utils/elevation.js';
@@ -19,6 +19,9 @@ createApp({
     const activeTab = ref('map');
     const operatorFilter = ref('ALL');
     const selectedRegion = ref('dolina-bobru');
+    const routeMode = ref('p2p'); // 'p2p' | 'loop'
+    const loopKm = ref(10);
+    const loopDir = ref('AUTO');
     const startId = ref('pl-pilchowice-zapora');
     const endId = ref('pl-rybnica');
     const profile = ref('hiking-mountain');
@@ -55,6 +58,7 @@ createApp({
     let hoverMarker = null;
     let abortCtrl = null;
     let wmtAbortCtrl = null;
+    let routeDebounceTimer = null;
 
     const t = computed(() => I18N[lang.value] || I18N.en);
     const presets = REGION_PRESETS;
@@ -109,7 +113,11 @@ createApp({
       return p.labels[lang.value] || p.labels.en;
     }
 
-    function getRouteLabel(idx) {
+    function getRouteLabel(idx, rt) {
+      if (routeMode.value === 'loop') {
+        const tag = rt?.loopCompass ? ` (${rt.loopCompass})` : '';
+        return `${t.value.loopTitlePrefix} #${idx + 1}${tag}`;
+      }
       if (idx === 0) return t.value.altPrimary;
       if (idx === 1) return t.value.altSecondary;
       return t.value.altTertiary;
@@ -146,15 +154,21 @@ createApp({
     }
 
     function exportActiveGpx(route) {
-      downloadRouteGpx(route, startStation.value.name, endStation.value.name);
+      const endName = routeMode.value === 'loop' ? `${startStation.value.name}_Loop` : endStation.value.name;
+      downloadRouteGpx(route, startStation.value.name, endName);
     }
 
     function getBrouterWebUrl(route) {
-      const pts = [startStation.value, ...viaPoints.value, endStation.value]
+      const rawPts = route?.waypoints?.length
+        ? route.waypoints
+        : (routeMode.value === 'loop'
+            ? [startStation.value, ...viaPoints.value, startStation.value]
+            : [startStation.value, ...viaPoints.value, endStation.value]);
+      const pts = rawPts
         .map((p) => `${p.lon.toFixed(5)},${p.lat.toFixed(5)}`)
         .join(';');
       const c = startStation.value;
-      return `https://brouter.de/brouter-web/#map=13/${c.lat.toFixed(4)}/${c.lon.toFixed(4)}/OpenTopoMap&lonlats=${pts}&profile=${profile.value}&alternativeidx=${route.altIdx}`;
+      return `https://brouter.de/brouter-web/#map=13/${c.lat.toFixed(4)}/${c.lon.toFixed(4)}/OpenTopoMap&lonlats=${pts}&profile=${profile.value}&alternativeidx=${routeMode.value === 'loop' ? 0 : route.altIdx}`;
     }
 
     function clearTrailPreview() {
@@ -288,7 +302,7 @@ createApp({
 
       for (const st of STATIONS) {
         const isStart = st.id === startId.value;
-        const isEnd = st.id === endId.value;
+        const isEnd = routeMode.value === 'p2p' && st.id === endId.value;
         const visible = operatorFilter.value === 'ALL' || st.operator === operatorFilter.value || isStart || isEnd;
         if (!visible) continue;
 
@@ -331,7 +345,10 @@ createApp({
 
         marker.on('click', (e) => {
           L.DomEvent.stopPropagation(e);
-          if (e.originalEvent.shiftKey) {
+          if (routeMode.value === 'loop') {
+            startId.value = st.id;
+            viaPoints.value = [];
+          } else if (e.originalEvent.shiftKey) {
             startId.value = st.id;
           } else if (startId.value !== st.id) {
             endId.value = st.id;
@@ -405,6 +422,13 @@ createApp({
       }
     }
 
+    function scheduleComputeRoutes() {
+      if (routeDebounceTimer) clearTimeout(routeDebounceTimer);
+      routeDebounceTimer = setTimeout(() => {
+        computeRoutes();
+      }, 320);
+    }
+
     async function computeRoutes() {
       if (abortCtrl) abortCtrl.abort();
       routes.value = [];
@@ -416,25 +440,38 @@ createApp({
       const a = startStation.value;
       const b = endStation.value;
 
-      if (a.id === b.id && viaPoints.value.length === 0) {
-        routingStatus.value = 'same-station';
-        drawRoutes(false);
-        return;
-      }
-
-      const straightKm = haversineKm(a.lat, a.lon, b.lat, b.lon);
-      if (straightKm > 75) {
-        routingStatus.value = 'too-far';
-        drawRoutes(false);
-        return;
+      if (routeMode.value === 'p2p') {
+        if (a.id === b.id && viaPoints.value.length === 0) {
+          routingStatus.value = 'same-station';
+          drawRoutes(false);
+          return;
+        }
+        const straightKm = haversineKm(a.lat, a.lon, b.lat, b.lon);
+        if (straightKm > 75) {
+          routingStatus.value = 'too-far';
+          drawRoutes(false);
+          return;
+        }
       }
 
       routingStatus.value = 'loading';
       abortCtrl = new AbortController();
 
       try {
-        const waypoints = [a, ...viaPoints.value, b];
-        const result = await fetchBRouterAlternatives(waypoints, profile.value, abortCtrl.signal);
+        let result;
+        if (routeMode.value === 'loop') {
+          result = await fetchBRouterLoops(
+            a,
+            Number(loopKm.value),
+            loopDir.value,
+            viaPoints.value,
+            profile.value,
+            abortCtrl.signal
+          );
+        } else {
+          const waypoints = [a, ...viaPoints.value, b];
+          result = await fetchBRouterAlternatives(waypoints, profile.value, abortCtrl.signal);
+        }
         routes.value = result;
         activeRouteIdx.value = 0;
         routingStatus.value = 'ready';
@@ -528,10 +565,10 @@ createApp({
       computeRoutes();
     }
 
-    watch([startId, endId, profile, () => viaPoints.value.length], () => {
+    watch([routeMode, loopKm, loopDir, startId, endId, profile, () => viaPoints.value.length], () => {
       drawStations();
       drawViaPoints();
-      computeRoutes();
+      scheduleComputeRoutes();
     });
 
     watch(operatorFilter, () => {
@@ -569,6 +606,9 @@ createApp({
       activeTab,
       operatorFilter,
       selectedRegion,
+      routeMode,
+      loopKm,
+      loopDir,
       startId,
       endId,
       profile,

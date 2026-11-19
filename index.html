@@ -82,25 +82,61 @@
             </div>
           </div>
 
+          <!-- Route Mode Switcher: Point-to-Point vs Single-Station Circular Loop -->
+          <div class="mode-switcher">
+            <button class="mode-btn" :class="{ active: routeMode === 'p2p' }" @click="routeMode = 'p2p'">
+              {{ t.modePointToPoint }}
+            </button>
+            <button class="mode-btn" :class="{ active: routeMode === 'loop' }" @click="routeMode = 'loop'; viaPoints = []">
+              {{ t.modeLoop }}
+            </button>
+          </div>
+
           <div class="station-row">
             <div class="field">
-              <label class="field-label"><span class="dot dot-a"></span> {{ t.startStation }}</label>
+              <label class="field-label">
+                <span class="dot dot-a"></span>
+                {{ routeMode === 'loop' ? t.loopStation : t.startStation }}
+              </label>
               <select class="compact-select" v-model="startId" @change="onManualStationChange">
                 <option v-for="st in filteredStations" :key="st.id" :value="st.id">
                   [{{ st.country }}] {{ st.name }} ({{ st.operator }} · {{ st.lines }})
                 </option>
               </select>
             </div>
-            <button class="btn-icon" :title="t.swapTitle" @click="swapStations">⇅</button>
+            <button v-if="routeMode === 'p2p'" class="btn-icon" :title="t.swapTitle" @click="swapStations">⇅</button>
           </div>
 
-          <div class="field">
+          <div class="field" v-if="routeMode === 'p2p'">
             <label class="field-label"><span class="dot dot-b"></span> {{ t.endStation }}</label>
             <select class="compact-select" v-model="endId" @change="onManualStationChange">
               <option v-for="st in filteredStations" :key="st.id" :value="st.id">
                 [{{ st.country }}] {{ st.name }} ({{ st.operator }} · {{ st.lines }})
               </option>
             </select>
+          </div>
+
+          <div class="grid-2" v-else>
+            <div class="field">
+              <label class="field-label">{{ t.loopDistance }}</label>
+              <select class="compact-select" v-model.number="loopKm">
+                <option :value="6">~ 6 km</option>
+                <option :value="10">~ 10 km</option>
+                <option :value="14">~ 14 km</option>
+                <option :value="20">~ 20 km</option>
+                <option :value="28">~ 28 km</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">{{ t.loopDirection }}</label>
+              <select class="compact-select" v-model="loopDir">
+                <option value="AUTO">{{ t.dirAuto }}</option>
+                <option value="N">{{ t.dirN }}</option>
+                <option value="E">{{ t.dirE }}</option>
+                <option value="S">{{ t.dirS }}</option>
+                <option value="W">{{ t.dirW }}</option>
+              </select>
+            </div>
           </div>
 
           <div class="toolbar-row">
@@ -150,7 +186,7 @@
             <div class="route-card-top">
               <div class="route-title">
                 <span class="route-swatch" :style="{ background: ROUTE_COLORS[idx % ROUTE_COLORS.length] }"></span>
-                {{ getRouteLabel(idx) }}
+                {{ getRouteLabel(idx, rt) }}
               </div>
             </div>
 

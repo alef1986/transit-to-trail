@@ -790,3 +790,40 @@ select.compact-select:focus {
   .grant-banner { grid-template-columns: 1fr; }
   .sidebar { width: 326px; }
 }
+
+/* Route Mode Switcher (A -> B vs Circular Loop) */
+.mode-switcher {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #141416;
+  padding: 2.5px;
+  border-radius: 7px;
+  gap: 3px;
+}
+
+.mode-btn {
+  border: none;
+  background: transparent;
+  color: #cbd5e1;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 5px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mode-btn.active {
+  background: var(--gold);
+  color: #141416;
+}
+
+.loop-badge {
+  font-size: 10px;
+  font-weight: 700;
+  background: #eef2ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+  padding: 1px 6px;
+  border-radius: 999px;
+}

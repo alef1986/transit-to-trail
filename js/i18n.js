@@ -1,5 +1,16 @@
 export const I18N = {
   en: {
+    modePointToPoint: 'A → B (Two Stations)',
+    modeLoop: '↻ Loop (One Station)',
+    loopStation: 'Start & Return Station (A)',
+    loopDistance: 'Target Loop Length',
+    loopDirection: 'Direction',
+    dirAuto: 'Auto (3 sectors)',
+    dirN: 'North (N)',
+    dirE: 'East (E)',
+    dirS: 'South (S)',
+    dirW: 'West (W)',
+    loopTitlePrefix: 'Circular Loop',
     demoHowTitle: 'How This Demonstrator Actually Works (Static Datasets vs. Live Routing)',
     demoHowIntro: 'To stay fast, zero-backend, and immune to browser CORS/rate-limit blocks during live demos, this prototype separates offline data preparation from live route calculation:',
     demoHowItems: [
@@ -111,6 +122,17 @@ export const I18N = {
   },
 
   pl: {
+    modePointToPoint: 'A → B (Dwie stacje)',
+    modeLoop: '↻ Pętla (Jedna stacja)',
+    loopStation: 'Stacja startu i powrotu (A)',
+    loopDistance: 'Docelowa długość pętli',
+    loopDirection: 'Kierunek',
+    dirAuto: 'Auto (3 kierunki)',
+    dirN: 'Północ (N)',
+    dirE: 'Wschód (E)',
+    dirS: 'Południe (S)',
+    dirW: 'Zachód (W)',
+    loopTitlePrefix: 'Pętla wokół stacji',
     demoHowTitle: 'Jak naprawdę działa ten demonstrator (dane statyczne vs. wyznaczanie tras)',
     demoHowIntro: 'Aby demonstrator działał szybko, bez backendu i bez błędów CORS w przeglądarce, rozdziela on przygotowanie danych od bieżącego wyznaczania trasy:',
     demoHowItems: [
@@ -222,6 +244,17 @@ export const I18N = {
   },
 
   cs: {
+    modePointToPoint: 'A → B (Dvě stanice)',
+    modeLoop: '↻ Okruh (Jedna stanice)',
+    loopStation: 'Výchozí a cílová stanice (A)',
+    loopDistance: 'Cílová délka okruhu',
+    loopDirection: 'Směr',
+    dirAuto: 'Auto (3 směry)',
+    dirN: 'Sever (N)',
+    dirE: 'Východ (E)',
+    dirS: 'Jih (S)',
+    dirW: 'Západ (W)',
+    loopTitlePrefix: 'Okruh ze stanice',
     demoHowTitle: 'Jak tento demonstrátor skutečně funguje (statická data vs. živý routing)',
     demoHowIntro: 'Aby demonstrátor běžel rychle, bez vlastního serveru a bez problémů s CORS v prohlížeči, odděluje předpřipravená data od výpočtu trasy:',
     demoHowItems: [
@@ -333,6 +366,17 @@ export const I18N = {
   },
 
   de: {
+    modePointToPoint: 'A → B (Zwei Bahnhöfe)',
+    modeLoop: '↻ Rundtour (Ein Bahnhof)',
+    loopStation: 'Start- & Zielbahnhof (A)',
+    loopDistance: 'Ziel-Distanz',
+    loopDirection: 'Richtung',
+    dirAuto: 'Auto (3 Richtungen)',
+    dirN: 'Norden (N)',
+    dirE: 'Osten (E)',
+    dirS: 'Süden (S)',
+    dirW: 'Westen (W)',
+    loopTitlePrefix: 'Rundtour ab Bahnhof',
     demoHowTitle: 'Wie dieser Demonstrator tatsächlich funktioniert (statische Daten vs. Live-Routing)',
     demoHowIntro: 'Für schnelle Ladezeiten, Zero-Backend-Betrieb und Schutz vor Browser-CORS-Blockaden trennt der Prototyp die Datenvorbereitung strikt vom Live-Routing:',
     demoHowItems: [
