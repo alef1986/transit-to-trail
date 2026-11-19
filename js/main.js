@@ -6,6 +6,7 @@ import { STAKEHOLDERS, EFFORT_STYLE } from './data/stakeholders.js';
 import { I18N } from './i18n.js';
 import { fetchBRouterAlternatives, fetchBRouterLoops, haversineKm, formatDuration } from './services/brouter.js';
 import { fetchCorridorTrails, fetchTrailGeometry, pickSteerPoint } from './services/waymarked.js';
+import { GEOPORTAL_WMS_LAYERS, createGeoportalWmsLayer, fetchGeoportalVectorGeoJson } from './services/geoportal.js';
 import { downloadRouteGpx } from './utils/gpx.js';
 import { buildElevationSeries, buildSvgPaths } from './utils/elevation.js';
 
@@ -20,8 +21,12 @@ createApp({
     const operatorFilter = ref('ALL');
     const selectedRegion = ref('dolina-bobru');
     const routeMode = ref('p2p'); // 'p2p' | 'loop'
-    const loopKm = ref(10);
+    const loopKm = ref(12);
     const loopDir = ref('AUTO');
+    const stationSearch = ref('');
+    const sidebarOpen = ref(window.innerWidth > 820);
+    let touchStartX = 0;
+    let touchStartY = 0;
     const startId = ref('pl-pilchowice-zapora');
     const endId = ref('pl-rybnica');
     const profile = ref('hiking-mountain');
@@ -30,6 +35,18 @@ createApp({
 
     const showWaymarked = ref(true);
     const showRailCorridors = ref(true);
+    const wmsDefs = GEOPORTAL_WMS_LAYERS;
+    const activeWms = ref({
+      culinary: false,
+      cultural: false,
+      underground: false,
+      agrotourism: false
+    });
+    const wmsLayerInstances = {};
+
+    // Trail corridor data source toggle ('static' = local file, 'live' = Overpass API)
+    const trailDataSource = ref('static');
+    const corridorError = ref(false);
 
     const routes = ref([]);
     const activeRouteIdx = ref(0);
@@ -94,10 +111,67 @@ createApp({
       return { short: loc.short, color: effStyle.color };
     }
 
+    const loopKmBounds = computed(() =>
+      profile.value === 'trekking'
+        ? { min: 5, max: 180, defaultKm: 30 }
+        : { min: 3, max: 60, defaultKm: 12 }
+    );
+
     const filteredStations = computed(() => {
-      if (operatorFilter.value === 'ALL') return STATIONS;
-      return STATIONS.filter((s) => s.operator === operatorFilter.value);
+      let list = operatorFilter.value === 'ALL'
+        ? STATIONS
+        : STATIONS.filter((s) => s.operator === operatorFilter.value);
+
+      const q = stationSearch.value.trim().toLowerCase();
+      if (q) {
+        list = list.filter((s) =>
+          s.name.toLowerCase().includes(q) ||
+          (s.lines && s.lines.toLowerCase().includes(q)) ||
+          s.country.toLowerCase().includes(q) ||
+          s.operator.toLowerCase().includes(q)
+        );
+      }
+
+      // Always keep currently selected A / B in the dropdown so v-model never blanks
+      const result = [...list];
+      for (const keepId of [startId.value, endId.value]) {
+        if (keepId && !result.some((s) => s.id === keepId)) {
+          const st = stationMap.get(keepId);
+          if (st) result.unshift(st);
+        }
+      }
+      return result;
     });
+
+    function normalizeLoopKm() {
+      const { min, max, defaultKm } = loopKmBounds.value;
+      const val = Number(loopKm.value);
+      if (!Number.isFinite(val) || val <= 0) {
+        loopKm.value = defaultKm;
+      } else if (val < min) {
+        loopKm.value = min;
+      } else if (val > max) {
+        loopKm.value = max;
+      } else {
+        loopKm.value = Math.round(val);
+      }
+    }
+
+    function onSidebarTouchStart(e) {
+      if (!e.touches || e.touches.length !== 1) return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }
+
+    function onSidebarTouchEnd(e) {
+      if (!e.changedTouches || e.changedTouches.length !== 1) return;
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+      // Swipe left > 55px horizontally closes the mobile drawer
+      if (dx < -55 && dy < 70 && window.innerWidth <= 820) {
+        sidebarOpen.value = false;
+      }
+    }
 
     const startStation = computed(() => stationMap.get(startId.value) || STATIONS[0]);
     const endStation = computed(() => stationMap.get(endId.value) || STATIONS[1]);
@@ -238,14 +312,21 @@ createApp({
     async function loadCorridorTrailsForActive() {
       if (wmtAbortCtrl) wmtAbortCtrl.abort();
       corridorTrails.value = [];
+      corridorError.value = false;
 
       const rt = activeRoute.value;
       if (!rt || !rt.coords?.length) return;
 
       corridorLoading.value = true;
       wmtAbortCtrl = new AbortController();
-      const { trails } = await fetchCorridorTrails(rt.coords, wmtAbortCtrl.signal);
+      const { trails, error } = await fetchCorridorTrails(
+        rt.coords,
+        profile.value,
+        trailDataSource.value,
+        wmtAbortCtrl.signal
+      );
       corridorTrails.value = trails;
+      corridorError.value = Boolean(error);
       corridorLoading.value = false;
     }
 
@@ -296,6 +377,66 @@ createApp({
       }
     }
 
+    function openStationPopup(st, latlng) {
+      if (!map) return;
+      const container = document.createElement('div');
+      container.className = 'st-popup';
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'st-popup-title';
+      titleEl.textContent = st.name;
+
+      const metaEl = document.createElement('div');
+      metaEl.className = 'st-popup-meta';
+      metaEl.textContent = `${st.country} · ${st.operator}${st.lines ? ' · ' + st.lines : ''}`;
+
+      const actionsEl = document.createElement('div');
+      actionsEl.className = 'st-popup-actions';
+
+      if (routeMode.value === 'loop') {
+        const btnLoop = document.createElement('button');
+        btnLoop.className = 'st-popup-btn loop';
+        btnLoop.textContent = t.value.popupSetLoop;
+        btnLoop.addEventListener('click', () => {
+          startId.value = st.id;
+          viaPoints.value = [];
+          onManualStationChange();
+          map.closePopup();
+        });
+        actionsEl.appendChild(btnLoop);
+      } else {
+        const btnA = document.createElement('button');
+        btnA.className = 'st-popup-btn start';
+        btnA.textContent = t.value.popupSetStart;
+        btnA.addEventListener('click', () => {
+          startId.value = st.id;
+          onManualStationChange();
+          map.closePopup();
+        });
+
+        const btnB = document.createElement('button');
+        btnB.className = 'st-popup-btn end';
+        btnB.textContent = t.value.popupSetEnd;
+        btnB.addEventListener('click', () => {
+          endId.value = st.id;
+          onManualStationChange();
+          map.closePopup();
+        });
+
+        actionsEl.appendChild(btnA);
+        actionsEl.appendChild(btnB);
+      }
+
+      container.appendChild(titleEl);
+      container.appendChild(metaEl);
+      container.appendChild(actionsEl);
+
+      L.popup({ closeButton: true, offset: [0, -6] })
+        .setLatLng(latlng || [st.lat, st.lon])
+        .setContent(container)
+        .openOn(map);
+    }
+
     function drawStations() {
       if (!stationLayerGroup) return;
       stationLayerGroup.clearLayers();
@@ -318,6 +459,10 @@ createApp({
             `<b>${isStart ? 'A · ' : 'B · '}${st.name}</b> <span style="opacity:.75">[${st.country} · ${st.operator} ${st.lines}]</span>`,
             { direction: 'top', offset: [0, -12] }
           );
+          pin.on('click', (e) => {
+            L.DomEvent.stopPropagation(e);
+            openStationPopup(st, e.latlng);
+          });
           pin.addTo(stationLayerGroup);
           continue;
         }
@@ -345,15 +490,7 @@ createApp({
 
         marker.on('click', (e) => {
           L.DomEvent.stopPropagation(e);
-          if (routeMode.value === 'loop') {
-            startId.value = st.id;
-            viaPoints.value = [];
-          } else if (e.originalEvent.shiftKey) {
-            startId.value = st.id;
-          } else if (startId.value !== st.id) {
-            endId.value = st.id;
-          }
-          onManualStationChange();
+          openStationPopup(st, e.latlng);
         });
 
         marker.addTo(stationLayerGroup);
@@ -460,9 +597,13 @@ createApp({
       try {
         let result;
         if (routeMode.value === 'loop') {
+          const safeKm = Math.max(
+            loopKmBounds.value.min,
+            Math.min(loopKmBounds.value.max, Number(loopKm.value) || loopKmBounds.value.defaultKm)
+          );
           result = await fetchBRouterLoops(
             a,
-            Number(loopKm.value),
+            safeKm,
             loopDir.value,
             viaPoints.value,
             profile.value,
@@ -527,6 +668,58 @@ createApp({
       }
     }
 
+    async function toggleWmsLayer(id) {
+      activeWms.value[id] = !activeWms.value[id];
+      const def = wmsDefs.find((d) => d.id === id);
+      if (!map || !def) return;
+
+      const existing = wmsLayerInstances[id];
+      if (!activeWms.value[id]) {
+        if (existing) map.removeLayer(existing);
+        return;
+      }
+
+      // Try live ArcGIS REST GeoJSON vector layer first (crisp clickable POIs/lines)
+      if (!existing) {
+        try {
+          const geojson = await fetchGeoportalVectorGeoJson(def);
+          const vecLayer = L.geoJSON(geojson, {
+            style: () => ({ color: def.color, weight: 3.5, opacity: 0.9 }),
+            pointToLayer: (feat, latlng) =>
+              L.circleMarker(latlng, {
+                radius: 6.5,
+                fillColor: def.color,
+                color: '#ffffff',
+                weight: 2,
+                fillOpacity: 0.95
+              }),
+            onEachFeature: (feat, layer) => {
+              const p = feat.properties || {};
+              const title = p.NAZWA || p.nazwa || p.name || p.NAME || p.OBIEKT || Object.values(p).find((v) => typeof v === 'string' && v.length > 2) || def.id;
+              layer.bindTooltip(`${def.icon} <b>${title}</b>`, { direction: 'top' });
+              if (feat.geometry?.type === 'Point') {
+                const [lon, lat] = feat.geometry.coordinates;
+                layer.on('click', (e) => {
+                  L.DomEvent.stopPropagation(e);
+                  viaPoints.value.push({ lat, lon, label: String(title).slice(0, 32) });
+                });
+              }
+            }
+          });
+          wmsLayerInstances[id] = vecLayer;
+        } catch {
+          // Graceful fallback to WMS tiles if server blocks CORS or layer has no vector query
+          wmsLayerInstances[id] = createGeoportalWmsLayer(def);
+        }
+      }
+
+      if (activeWms.value[id] && wmsLayerInstances[id]) {
+        wmsLayerInstances[id].addTo(map);
+      }
+    }
+
+
+
     function initMap() {
       map = L.map('map', {
         center: [50.94, 15.64],
@@ -546,6 +739,8 @@ createApp({
         attribution: '© Waymarked Trails'
       });
       if (showWaymarked.value) waymarkedLayer.addTo(map);
+
+      // Geoportal layers load lazily (ArcGIS vector GeoJSON first, WMS fallback)
 
       railLayerGroup = L.layerGroup().addTo(map);
       previewTrailLayerGroup = L.layerGroup().addTo(map);
@@ -581,6 +776,24 @@ createApp({
       else map.removeLayer(waymarkedLayer);
     });
 
+    watch(profile, (val) => {
+      clearTrailPreview();
+      if (val === 'trekking' && Number(loopKm.value) <= 15) {
+        loopKm.value = 30;
+      } else if (val === 'hiking-mountain' && Number(loopKm.value) > 60) {
+        loopKm.value = 12;
+      }
+      if (waymarkedLayer) {
+        const wmtType = val === 'trekking' ? 'cycling' : 'hiking';
+        waymarkedLayer.setUrl(`https://tile.waymarkedtrails.org/${wmtType}/{z}/{x}/{y}.png`);
+      }
+    });
+
+    watch(trailDataSource, () => {
+      clearTrailPreview();
+      loadCorridorTrailsForActive();
+    });
+
     watch(showRailCorridors, () => {
       drawRailCorridors();
     });
@@ -608,7 +821,13 @@ createApp({
       selectedRegion,
       routeMode,
       loopKm,
+      loopKmBounds,
       loopDir,
+      stationSearch,
+      sidebarOpen,
+      normalizeLoopKm,
+      onSidebarTouchStart,
+      onSidebarTouchEnd,
       startId,
       endId,
       profile,
@@ -616,6 +835,12 @@ createApp({
       viaPoints,
       showWaymarked,
       showRailCorridors,
+      wmsDefs,
+      activeWms,
+      toggleWmsLayer,
+      trailDataSource,
+      corridorError,
+      loadCorridorTrailsForActive,
       routes,
       activeRouteIdx,
       activeRoute,

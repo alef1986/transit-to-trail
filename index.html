@@ -19,6 +19,14 @@
     <!-- Top Header -->
     <header class="app-header">
       <div class="brand">
+        <button
+          v-if="activeTab === 'map'"
+          class="mobile-drawer-toggle"
+          @click="sidebarOpen = !sidebarOpen"
+          :aria-label="t.mobileMenuOpen"
+        >
+          {{ sidebarOpen ? '✕' : '☰' }}
+        </button>
         <div class="brand-mark">TT</div>
         <div class="brand-text">
           <div class="brand-title">
@@ -41,16 +49,16 @@
 
         <div class="lang-switcher">
           <button class="lang-btn" :class="{ active: lang === 'pl' }" @click="lang = 'pl'">
-            <span class="lang-flag">🇵🇱</span> PL
+            <span class="lang-flag">🇵🇱</span> <span class="lang-code-txt">PL</span>
           </button>
           <button class="lang-btn" :class="{ active: lang === 'cs' }" @click="lang = 'cs'">
-            <span class="lang-flag">🇨🇿</span> CS
+            <span class="lang-flag">🇨🇿</span> <span class="lang-code-txt">CS</span>
           </button>
           <button class="lang-btn" :class="{ active: lang === 'de' }" @click="lang = 'de'">
-            <span class="lang-flag">🇩🇪</span> DE
+            <span class="lang-flag">🇩🇪</span> <span class="lang-code-txt">DE</span>
           </button>
           <button class="lang-btn" :class="{ active: lang === 'en' }" @click="lang = 'en'">
-            <span class="lang-flag">🇬🇧</span> EN
+            <span class="lang-flag">🇬🇧</span> <span class="lang-code-txt">EN</span>
           </button>
         </div>
       </div>
@@ -58,7 +66,17 @@
 
     <!-- Map & Planner Workspace -->
     <main class="workspace" v-show="activeTab === 'map'">
-      <aside class="sidebar">
+      <div class="mobile-backdrop" v-if="sidebarOpen" @click="sidebarOpen = false"></div>
+      <aside
+        class="sidebar"
+        :class="{ 'mobile-open': sidebarOpen }"
+        @touchstart.passive="onSidebarTouchStart"
+        @touchend.passive="onSidebarTouchEnd"
+      >
+        <div class="sidebar-mobile-bar">
+          <span>← {{ t.mobileSwipeHint }}</span>
+          <button class="sidebar-close-btn" @click="sidebarOpen = false">✕</button>
+        </div>
         <div class="controls-block">
           <div class="grid-2">
             <div class="field">
@@ -92,6 +110,22 @@
             </button>
           </div>
 
+          <!-- Station Search Filter -->
+          <div class="search-input-wrap">
+            <input
+              type="text"
+              class="compact-input"
+              v-model="stationSearch"
+              :placeholder="t.searchStationPlaceholder"
+            />
+            <button
+              v-if="stationSearch"
+              class="input-clear-btn"
+              @click="stationSearch = ''"
+              title="Clear"
+            >×</button>
+          </div>
+
           <div class="station-row">
             <div class="field">
               <label class="field-label">
@@ -118,14 +152,21 @@
 
           <div class="grid-2" v-else>
             <div class="field">
-              <label class="field-label">{{ t.loopDistance }}</label>
-              <select class="compact-select" v-model.number="loopKm">
-                <option :value="6">~ 6 km</option>
-                <option :value="10">~ 10 km</option>
-                <option :value="14">~ 14 km</option>
-                <option :value="20">~ 20 km</option>
-                <option :value="28">~ 28 km</option>
-              </select>
+              <label class="field-label">
+                {{ t.loopDistance }} ({{ loopKmBounds.min }}–{{ loopKmBounds.max }})
+              </label>
+              <div class="km-input-wrap">
+                <input
+                  type="number"
+                  class="compact-input"
+                  v-model.number="loopKm"
+                  :min="loopKmBounds.min"
+                  :max="loopKmBounds.max"
+                  step="1"
+                  @blur="normalizeLoopKm"
+                />
+                <span class="km-unit">km</span>
+              </div>
             </div>
             <div class="field">
               <label class="field-label">{{ t.loopDirection }}</label>
@@ -223,7 +264,22 @@
             <div class="corridor-box" v-if="activeRouteIdx === idx" @click.stop>
               <div class="corridor-head">
                 <span>{{ t.inspiredByLabel }}</span>
-                <span v-if="corridorLoading">{{ t.corridorLoading }}</span>
+                <div class="source-toggle" @click.stop>
+                  <button
+                    class="source-btn"
+                    :class="{ active: trailDataSource === 'static' }"
+                    @click="trailDataSource = 'static'"
+                  >
+                    {{ t.sourceStatic }}
+                  </button>
+                  <button
+                    class="source-btn"
+                    :class="{ active: trailDataSource === 'live' }"
+                    @click="trailDataSource = 'live'"
+                  >
+                    {{ t.sourceLive }}
+                  </button>
+                </div>
               </div>
 
               <div class="corridor-list" v-if="corridorTrails.length">
@@ -239,6 +295,7 @@
                     @click="togglePreviewTrail(tr)"
                   >
                     <span class="trail-color-dot" :style="{ background: tr.color }"></span>
+                    <span style="font-size:10px; flex-shrink:0;">{{ tr.kind === 'bicycle' ? '🚲' : '🥾' }}</span>
                     <span class="corridor-name-text">{{ tr.name }}</span>
                   </button>
 
@@ -263,7 +320,13 @@
                   </div>
                 </div>
               </div>
-              <div class="corridor-empty" v-else-if="!corridorLoading">
+              <div class="corridor-empty" v-else-if="corridorLoading">
+                {{ t.corridorLoading }}
+              </div>
+              <div class="corridor-empty" v-else-if="corridorError">
+                {{ t.corridorApiError }}
+              </div>
+              <div class="corridor-empty" v-else>
                 {{ t.corridorEmpty }}
               </div>
             </div>
@@ -281,9 +344,23 @@
         <div class="map-canvas-wrap">
           <div id="map"></div>
 
+          <button
+            v-if="!sidebarOpen"
+            class="mobile-map-fab"
+            @click="sidebarOpen = true"
+          >
+            ☰ {{ t.mobileMenuOpen }}
+          </button>
+
           <div class="map-overlay-card">
             <label><input type="checkbox" v-model="showWaymarked" /> {{ t.waymarkedOverlay }}</label>
             <label><input type="checkbox" v-model="showRailCorridors" /> {{ t.railOverlay }}</label>
+            <div class="overlay-divider"></div>
+            <div class="overlay-section-title">{{ t.wmsGroupTitle }}</div>
+            <label v-for="def in wmsDefs" :key="def.id">
+              <input type="checkbox" :checked="activeWms[def.id]" @change="toggleWmsLayer(def.id)" />
+              <span>{{ def.icon }} {{ t[def.i18nKey] }}</span>
+            </label>
           </div>
 
           <div class="map-legend">

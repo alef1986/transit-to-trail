@@ -77,7 +77,13 @@ function parseSurfaceStats(messages) {
   return { markedPct, naturalPct, pavedPct };
 }
 
-function computeNaismithMinutes(distanceKm, ascentM) {
+function computeDurationMinutes(distanceKm, ascentM, profile = 'hiking-mountain') {
+  if (profile === 'trekking') {
+    // Touring / gravel cycling: ~15 km/h horizontal + 1 min per 15m climb
+    const hours = distanceKm / 15.0 + ascentM / 900;
+    return Math.max(10, Math.round(hours * 60));
+  }
+  // Hiking (DIN 33466 / Naismith): ~4 km/h horizontal + 1 min per 7.5m climb
   const hours = distanceKm / 4.0 + ascentM / 450;
   return Math.max(10, Math.round(hours * 60));
 }
@@ -116,7 +122,7 @@ async function fetchSingleBRouterRoute(points, profile, altIdx, signal, meta = {
   }
 
   const surfaces = parseSurfaceStats(props.messages);
-  const durationMin = computeNaismithMinutes(distKm, ascentM);
+  const durationMin = computeDurationMinutes(distKm, ascentM, profile);
 
   return {
     altIdx,

@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
 """
-Transit-Trail Commons — Hiking Trails Static Dataset Builder
-=============================================================
-Fetches official marked hiking routes (route=hiking) across the Neisse–Nysa–Nisa
-cross-border region (Lower Silesia, Saxony, Northern Bohemia) from OpenStreetMap
-via Overpass API, stitches member ways into simplified polylines, generates
-human-readable labels even when OSM `name` is empty, and writes
-`js/data/hikingTrails.js` for fast, CORS-free client-side lookup, map preview,
-and route steering.
+Transit-Trail Commons — Hiking & Cycling Trails Static Dataset Builder
+======================================================================
+Fetches official marked hiking AND cycling routes (route=hiking|foot|bicycle|mtb)
+across the Neisse–Nysa–Nisa cross-border region (Lower Silesia, Saxony,
+Northern Bohemia) from OpenStreetMap via Overpass API, stitches member ways into
+simplified polylines, and writes `js/data/hikingTrails.js`.
 
-Zero external dependencies (uses Python standard library only).
+Zero external dependencies (Python standard library only).
 
 Usage:
     python scripts/fetch_trails_data.py
-    python scripts/fetch_trails_data.py --max-trails 250 --epsilon 0.0005
+    python scripts/fetch_trails_data.py --max-trails 2500 --epsilon 0.0007
 """
 
 import argparse
@@ -27,7 +25,7 @@ import urllib.request
 
 # Bounding box covering Lower Silesia (PL), Northern Bohemia (CZ), Upper Lusatia & Saxon Switzerland (DE)
 # Format: (south, west, north, east)
-BBOX = (50.08, 13.98, 51.32, 17.05)
+BBOX = (50.05, 13.95, 51.35, 17.15)
 
 OVERPASS_MIRRORS = [
     "https://overpass-api.de/api/interpreter",
@@ -76,7 +74,7 @@ def point_line_distance(pt, start, end):
     return math.hypot(pt[0] - proj_x, pt[1] - proj_y)
 
 
-def douglas_peucker(points, epsilon=0.0005):
+def douglas_peucker(points, epsilon=0.0007):
     if len(points) < 3:
         return points
     dmax = 0.0
@@ -95,9 +93,8 @@ def douglas_peucker(points, epsilon=0.0005):
 
 
 def stitch_way_segments(way_lists):
-    """Stitch [lat, lon] way coordinate arrays into continuous polylines."""
     def key(pt):
-        return (round(pt[0], 5), round(pt[1], 5))
+        return (round(pt[0], 4), round(pt[1], 4))
 
     pool = [list(w) for w in way_lists if len(w) >= 2]
     lines = []
@@ -137,7 +134,7 @@ def stitch_way_segments(way_lists):
     return lines
 
 
-def query_overpass(ql, timeout=120):
+def query_overpass(ql, timeout=150):
     payload = urllib.parse.urlencode({"data": ql}).encode("utf-8")
     last_err = None
     for mirror in OVERPASS_MIRRORS:
@@ -146,7 +143,7 @@ def query_overpass(ql, timeout=120):
             mirror,
             data=payload,
             headers={
-                "User-Agent": "TransitTrailCommons-TrailBuilder/1.0 (https://github.com/alef1986/transit-to-trail)"
+                "User-Agent": "TransitTrailCommons-TrailBuilder/2.0 (https://github.com/alef1986/transit-to-trail)"
             },
         )
         try:
@@ -159,7 +156,10 @@ def query_overpass(ql, timeout=120):
     raise RuntimeError(f"All Overpass mirrors failed: {last_err}")
 
 
-def detect_color_and_label(tags, rel_id):
+def detect_meta(tags, rel_id):
+    route_tag = (tags.get("route") or "hiking").lower()
+    kind = "bicycle" if route_tag in ("bicycle", "mtb") else "hiking"
+
     name = (tags.get("name") or "").strip()
     ref = (tags.get("ref") or "").strip()
     osmc = (tags.get("osmc:symbol") or "").lower()
@@ -189,51 +189,53 @@ def detect_color_and_label(tags, rel_id):
         elif "czarn" in low_n or "čern" in low_n or "schwarz" in low_n:
             detected_color = "black"
 
-    hex_color = COLOR_HEX.get(detected_color, "#d4af37")
+    hex_color = COLOR_HEX.get(detected_color, "#0284c7" if kind == "bicycle" else "#d4af37")
 
     if name:
         label = name if not ref or ref in name else f"{name} ({ref})"
     elif ref:
-        label = f"Trail {ref}"
+        label = f"{'Bike' if kind == 'bicycle' else 'Trail'} {ref}"
     elif detected_color:
-        label = f"{detected_color.capitalize()} marked trail #{rel_id}"
+        label = f"{detected_color.capitalize()} {'cycling' if kind == 'bicycle' else 'hiking'} route #{rel_id}"
     else:
-        label = f"Hiking trail #{rel_id}"
+        label = f"{'Cycling' if kind == 'bicycle' else 'Hiking'} route #{rel_id}"
 
-    # Determine network rank (local/regional preferred over continental)
     net = (tags.get("network") or "").lower()
-    if "lwn" in net or "local" in net:
+    if net in ("lwn", "lcn") or "local" in net:
         rank = 1
-    elif "rwn" in net or "regional" in net:
+    elif net in ("rwn", "rcn") or "regional" in net:
         rank = 2
-    elif "nwn" in net or "national" in net:
+    elif net in ("nwn", "ncn") or "national" in net:
         rank = 3
-    elif "iwn" in net or "international" in net:
+    elif net in ("iwn", "icn") or "international" in net:
         rank = 4
     else:
         rank = 5
 
-    return label, hex_color, rank
+    return kind, label, hex_color, rank
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Build static hikingTrails.js from OSM")
-    parser.add_argument("--max-trails", type=int, default=220, help="Max trails to keep (default: 220)")
-    parser.add_argument("--epsilon", type=float, default=0.00055, help="Simplification tolerance in deg")
+    parser = argparse.ArgumentParser(description="Build static hiking & cycling trails JS from OSM")
+    parser.add_argument("--max-trails", type=int, default=2500, help="Max trails to keep (default: 2500)")
+    parser.add_argument("--epsilon", type=float, default=0.0007, help="Simplification tolerance in deg (default: 0.0007 ≈ 60m)")
     args = parser.parse_args()
 
     s, w, n, e = BBOX
-    print(f"Fetching route=hiking relations with geometry in bbox ({s}, {w}, {n}, {e})...")
+    print(f"Fetching hiking & cycling relations in bbox ({s}, {w}, {n}, {e})...")
     ql = f"""
-    [out:json][timeout:120];
-    relation["route"="hiking"]({s},{w},{n},{e});
+    [out:json][timeout:150];
+    relation["route"~"^(hiking|foot|bicycle|mtb)$"]({s},{w},{n},{e});
     out body geom;
     """
     data = query_overpass(ql)
     elements = data.get("elements", [])
-    print(f"Received {len(elements)} OSM hiking relations.")
+    print(f"Received {len(elements)} OSM hiking/cycling relations.")
 
     trails = []
+    hiking_cnt = 0
+    bike_cnt = 0
+
     for el in elements:
         if el.get("type") != "relation":
             continue
@@ -246,7 +248,7 @@ def main():
             if m.get("type") == "way" and m.get("role") not in ("alternate", "subroute"):
                 geom = m.get("geometry")
                 if geom and len(geom) >= 2:
-                    way_lists.append([[round(pt["lat"], 5), round(pt["lon"], 5)] for pt in geom])
+                    way_lists.append([[round(pt["lat"], 4), round(pt["lon"], 4)] for pt in geom])
 
         if not way_lists:
             continue
@@ -263,7 +265,7 @@ def main():
             seg_len = 0.0
             for i in range(1, len(simp)):
                 seg_len += haversine_km(simp[i - 1][0], simp[i - 1][1], simp[i][0], simp[i][1])
-            if seg_len >= 0.25:
+            if seg_len >= 0.2:
                 total_len_km += seg_len
                 for pt in simp:
                     if pt[0] < min_lat: min_lat = pt[0]
@@ -272,12 +274,18 @@ def main():
                     if pt[1] > max_lon: max_lon = pt[1]
                 segments.append(simp)
 
-        if not segments or total_len_km < 0.5:
+        if not segments or total_len_km < 0.4:
             continue
 
-        label, hex_color, rank = detect_color_and_label(tags, rel_id)
+        kind, label, hex_color, rank = detect_meta(tags, rel_id)
+        if kind == "bicycle":
+            bike_cnt += 1
+        else:
+            hiking_cnt += 1
+
         trails.append({
             "id": rel_id,
+            "kind": kind,
             "name": label,
             "color": hex_color,
             "rank": rank,
@@ -286,21 +294,33 @@ def main():
             "segments": segments,
         })
 
-    # Sort so local/regional named trails come first and trim to max-trails
-    trails.sort(key=lambda t: (t["rank"], 0 if not t["name"].startswith("Hiking trail #") else 1, -t["lenKm"]))
-    trails = trails[: args.max_trails]
+    # Sort each kind separately (named local/regional first) and keep a balanced quota
+    hiking_list = [t for t in trails if t["kind"] == "hiking"]
+    bike_list = [t for t in trails if t["kind"] == "bicycle"]
+
+    sort_key = lambda t: (t["rank"], 0 if not t["name"].endswith(f"#{t['id']}") else 1, -t["lenKm"])
+    hiking_list.sort(key=sort_key)
+    bike_list.sort(key=sort_key)
+
+    max_bike = min(len(bike_list), int(args.max_trails * 0.45))
+    max_hiking = min(len(hiking_list), args.max_trails - max_bike)
+    trails = hiking_list[:max_hiking] + bike_list[:max_bike]
+
     for item in trails:
         del item["rank"]
 
+    saved_hiking = sum(1 for t in trails if t["kind"] == "hiking")
+    saved_bike = sum(1 for t in trails if t["kind"] == "bicycle")
+
     with open(OUT_JS_PATH, "w", encoding="utf-8") as f:
-        f.write("// Pre-extracted static hiking trails dataset generated by scripts/fetch_trails_data.py\n")
-        f.write("// Source: OpenStreetMap (route=hiking relations, ODbL)\n")
+        f.write("// Pre-extracted static hiking & cycling trails generated by scripts/fetch_trails_data.py\n")
+        f.write("// Source: OpenStreetMap (route=hiking|foot|bicycle|mtb, ODbL)\n")
         f.write("export const HIKING_TRAILS = ")
         json.dump(trails, f, ensure_ascii=False, separators=(",", ":"))
         f.write(";\n")
 
     size_kb = os.path.getsize(OUT_JS_PATH) / 1024
-    print(f"Wrote {len(trails)} trails to {OUT_JS_PATH} ({size_kb:.1f} KB)")
+    print(f"Wrote {len(trails)} trails (hiking={saved_hiking}, bicycle={saved_bike}) out of {hiking_cnt + bike_cnt} raw -> {OUT_JS_PATH} ({size_kb:.1f} KB)")
 
 
 if __name__ == "__main__":
