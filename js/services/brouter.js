@@ -55,7 +55,6 @@ function parseSurfaceStats(messages) {
 }
 
 function computeNaismithMinutes(distanceKm, ascentM) {
-  // DIN 33466 / Naismith alpine standard: ~4 km/h horizontal + 1 min per 5m ascent
   const hours = distanceKm / 4.0 + ascentM / 450;
   return Math.max(10, Math.round(hours * 60));
 }
@@ -81,7 +80,7 @@ export async function fetchBRouterAlternatives(points, profile = 'hiking-mountai
     const props = feat.properties || {};
     const distKm = Number(props['track-length'] || 0) / 1000;
     const ascentM = Math.round(Number(props['filtered ascend'] || 0));
-    const coords = feat.geometry.coordinates; // [lon, lat, ele]
+    const coords = feat.geometry.coordinates;
 
     let descentM = 0;
     let minEle = Infinity;

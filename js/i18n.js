@@ -34,22 +34,21 @@ export const I18N = {
     surfMarked: 'Marked trails',
     surfPath: 'Forest paths',
     surfPaved: 'Paved',
+    inspiredByLabel: 'Built on NGO-marked trails (Waymarked Trails)',
     exportGpx: 'GPX 1.1',
     openBrouter: 'BRouter-Web',
-    openMapy: 'Mapy.com',
     waymarkedOverlay: 'Waymarked Trails Overlay',
     railOverlay: 'Regional Rail Corridors',
     elevTitle: 'Elevation Profile (hover to locate on map)',
     legendKD: 'KD (PL)',
     legendCD: 'ČD (CZ)',
     legendDE: 'Trilex (DE)',
+    legendRail: 'Rail Corridor',
     legendRoute: 'Active Route',
 
-    // Socio-Tech & University Pitch
     modelKicker: 'Socio-Technical Framework & Research Proposal',
     modelHeroTitle: 'Transit-Trail Commons: Low-Overhead Cross-Border Mobility via Open Data',
     modelHeroText: 'Instead of asking regional rail operators, municipalities, and hiking clubs to build a joint IT system or manually maintain cross-border GPX tours, this framework aligns software boundaries with existing institutional incentives.',
-
     uniTitle: 'Why a University? Interdisciplinary Case & EU Grant Strategy',
     uniIntro: 'A university is the ideal neutral anchor and general contractor for an EU-funded pilot (e.g., Interreg Poland–Saxony, Interreg Czechia–Poland, or Horizon Europe): it bridges institutional silos while turning a real regional need into an interdisciplinary research and teaching platform.',
     disc1Title: 'Systems Engineering',
@@ -64,7 +63,6 @@ export const I18N = {
     grantStage1Text: 'Lower Silesia, Saxony, and Northern Bohemia receive a live, zero-backend public tool: passengers explore car-free, rail operators grow off-peak ridership, and municipalities promote local POIs without maintaining full trails.',
     grantStage2Title: 'Stage 2 — Scalable European Blueprint',
     grantStage2Text: 'The EU gains a validated, forkable socio-technical framework and institutional playbook that any other cross-border European region can deploy with minimal investment.',
-
     arch1Title: '1. Rail Operators (GTFS / NeTEx)',
     arch1Items: [
       'Publish standard open stop coordinates and schedules (already mandated by EU ITS directives).',
@@ -120,21 +118,21 @@ export const I18N = {
     surfMarked: 'Szlaki znakowane',
     surfPath: 'Ścieżki leśne',
     surfPaved: 'Utwardzone',
+    inspiredByLabel: 'Oparte na szlakach znakowanych (Waymarked Trails)',
     exportGpx: 'GPX 1.1',
     openBrouter: 'BRouter-Web',
-    openMapy: 'Mapy.com',
     waymarkedOverlay: 'Warstwa szlaków (Waymarked)',
     railOverlay: 'Korytarze kolejowe',
     elevTitle: 'Profil wysokościowy (najedź kursorem, aby wskazać na mapie)',
     legendKD: 'KD (PL)',
     legendCD: 'ČD (CZ)',
     legendDE: 'Trilex (DE)',
+    legendRail: 'Korytarz kolejowy',
     legendRoute: 'Aktywna trasa',
 
     modelKicker: 'Framework socjotechniczny i koncepcja projektu badawczego',
     modelHeroTitle: 'Transit-Trail Commons: lekka mobilność transgraniczna na otwartych danych',
     modelHeroText: 'Zamiast zmuszać przewoźników kolejowych, gminy i PTTK do budowy wspólnego systemu IT i ręcznego utrzymywania setek plików GPX, architektura dopasowuje granice danych do istniejących interesów instytucji.',
-
     uniTitle: 'Dlaczego uczelnia? Projekt interdyscyplinarny i strategia grantowa UE',
     uniIntro: 'Uczelnia techniczna jest idealnym, neutralnym generalnym wykonawcą i wnioskodawcą grantu UE (np. Interreg Polska–Saksonia, Interreg Czechy–Polska, Horyzont Europa) — łączy instytucje ponad granicami i tworzy żywy poligon badawczo-dydaktyczny.',
     disc1Title: 'Inżynieria Systemów',
@@ -149,7 +147,6 @@ export const I18N = {
     grantStage1Text: 'Dolny Śląsk, Saksonia i północne Czechy otrzymują gotowe narzędzie dla pasażerów, przewoźników (wzrost frekwencji poza szczytem) i gmin (promocja lokalnych POI bez obsługi całych tras).',
     grantStage2Title: 'Krok 2 — Skalowalny framework dla UE',
     grantStage2Text: 'Unia Europejska otrzymuje zweryfikowany, otwarty framework socjotechniczny i podręcznik wdrożeniowy, który inne regiony mogą skopiować minimalnym kosztem.',
-
     arch1Title: '1. Przewoźnicy kolejowi (GTFS / NeTEx)',
     arch1Items: [
       'Publikują standardowe otwarte rozkłady i lokalizacje stacji (zgodnie z dyrektywami UE).',
@@ -205,21 +202,21 @@ export const I18N = {
     surfMarked: 'Značené trasy',
     surfPath: 'Lesní cesty',
     surfPaved: 'Zpevněné',
+    inspiredByLabel: 'Vychází ze značených tras (Waymarked Trails)',
     exportGpx: 'GPX 1.1',
     openBrouter: 'BRouter-Web',
-    openMapy: 'Mapy.com',
     waymarkedOverlay: 'Vrstva značených tras',
     railOverlay: 'Železniční koridory',
     elevTitle: 'Výškový profil (přejetím zobrazíte polohu na mapě)',
     legendKD: 'KD (PL)',
     legendCD: 'ČD (CZ)',
     legendDE: 'Trilex (DE)',
+    legendRail: 'Železniční koridor',
     legendRoute: 'Aktivní trasa',
 
     modelKicker: 'Sociotechnický framework a výzkumný záměr',
     modelHeroTitle: 'Transit-Trail Commons: přeshraniční mobilita nad otevřenými daty',
     modelHeroText: 'Namísto budování nákladného společného IT systému a ruční údržby stovek GPX tras tento framework sladí datová rozhraní s přirozenými zájmy dopravců, obcí a turistických klubů.',
-
     uniTitle: 'Proč univerzita? Interdisciplinární případ a grantová strategie EU',
     uniIntro: 'Univerzita je ideálním neutrálním koordinátorem a hlavním řešitelem evropského grantu (Interreg, Horizont Evropa) — propojuje instituce a přináší špičkový mezioborový výzkum.',
     disc1Title: 'Systémové inženýrství',
@@ -234,7 +231,6 @@ export const I18N = {
     grantStage1Text: 'Dolní Slezsko, Sasko a severní Čechy získají živý nástroj pro cestující, dopravce i obce bez náročného provozu.',
     grantStage2Title: 'Krok 2 — Škálovatelný evropský framework',
     grantStage2Text: 'EU získá ověřený, otevřený framework a metodiku, kterou mohou s minimálními náklady převzít další příhraniční regiony.',
-
     arch1Title: '1. Železniční dopravci (GTFS / NeTEx)',
     arch1Items: [
       'Publikují standardní otevřená data o stanicích a jízdních řádech.',
@@ -290,21 +286,21 @@ export const I18N = {
     surfMarked: 'Markierte Wege',
     surfPath: 'Waldwege',
     surfPaved: 'Asphalt',
+    inspiredByLabel: 'Basiert auf markierten Wanderwegen (Waymarked Trails)',
     exportGpx: 'GPX 1.1',
     openBrouter: 'BRouter-Web',
-    openMapy: 'Mapy.com',
     waymarkedOverlay: 'Wanderweg-Overlay',
     railOverlay: 'Bahnkorridore',
     elevTitle: 'Höhenprofil (Mausbewegung markiert Position auf der Karte)',
     legendKD: 'KD (PL)',
     legendCD: 'ČD (CZ)',
     legendDE: 'Trilex (DE)',
+    legendRail: 'Bahnkorridor',
     legendRoute: 'Aktive Route',
 
     modelKicker: 'Soziotechnisches Framework & Forschungskonzept',
     modelHeroTitle: 'Transit-Trail Commons: Grenzüberschreitende Freizeitmobilität mit Open Data',
     modelHeroText: 'Anstatt Verkehrsverbünde, Kommunen und Wandervereine zum Aufbau eines gemeinsamen IT-Systems zu verpflichten, richtet dieses Framework Datenschnittstellen exakt an bestehenden institutionellen Anreizen aus.',
-
     uniTitle: 'Warum eine Universität? Interdisziplinärer Case & EU-Förderstrategie',
     uniIntro: 'Eine Universität ist der ideale neutrale Generalunternehmer und EU-Antragsteller (z. B. Interreg Polen–Sachsen, Tschechien–Polen oder Horizon Europe): Sie verbindet Institutionen und schafft ein lebendiges interdisziplinäres Forschungsfeld.',
     disc1Title: 'Systems Engineering',
@@ -319,7 +315,6 @@ export const I18N = {
     grantStage1Text: 'Niederschlesien, Sachsen und Nordböhmen erhalten eine produktive Plattform für Fahrgäste, Bahnbetreiber (Nebenverkehrszeit) und Kommunen (atomare POI-Pflege).',
     grantStage2Title: 'Stufe 2 — Skalierbares EU-Framework',
     grantStage2Text: 'Die EU erhält eine validierte, frei nachnutzbare soziotechnische Blaupause, mit der andere Grenzregionen ähnliche Vorhaben kostengünstig umsetzen können.',
-
     arch1Title: '1. Bahnbetreiber (GTFS / NeTEx)',
     arch1Items: [
       'Veröffentlichen offene Haltestellen- und Fahrplandaten nach EU-Standards.',

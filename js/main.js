@@ -4,11 +4,13 @@ import { RAIL_CORRIDORS } from './data/railLines.js';
 import { REGION_PRESETS } from './data/presets.js';
 import { I18N } from './i18n.js';
 import { fetchBRouterAlternatives, haversineKm, formatDuration } from './services/brouter.js';
+import { fetchCorridorTrails } from './services/waymarked.js';
 import { downloadRouteGpx } from './utils/gpx.js';
 import { buildElevationSeries, buildSvgPaths } from './utils/elevation.js';
 
-const ROUTE_COLORS = ['#d97706', '#2563eb', '#7c3aed'];
-const OP_COLORS = { KD: '#ca8a04', CD: '#1d4ed8', Trilex: '#0f766e' };
+const ROUTE_COLORS = ['#ea580c', '#2563eb', '#7c3aed'];
+const OP_COLORS = { KD: '#eab308', CD: '#2563eb', Trilex: '#0d9488' };
+const OP_DASH_COLORS = { KD: '#facc15', CD: '#60a5fa', Trilex: '#2dd4bf' };
 
 createApp({
   setup() {
@@ -27,9 +29,10 @@ createApp({
 
     const routes = ref([]);
     const activeRouteIdx = ref(0);
-    const routingStatus = ref('ready'); // ready | loading | error | too-far | same-station
+    const routingStatus = ref('ready');
     const errorDetail = ref('');
 
+    const inspiredTrails = ref([]);
     const hoverInfo = ref(null);
 
     let map = null;
@@ -40,6 +43,7 @@ createApp({
     let viaLayerGroup = null;
     let hoverMarker = null;
     let abortCtrl = null;
+    let wmtAbortCtrl = null;
 
     const t = computed(() => I18N[lang.value] || I18N.en);
     const presets = REGION_PRESETS;
@@ -58,7 +62,7 @@ createApp({
       activeRoute.value ? buildElevationSeries(activeRoute.value.coords) : []
     );
 
-    const elevSvg = computed(() => buildSvgPaths(elevSeries.value, 600, 72));
+    const elevSvg = computed(() => buildSvgPaths(elevSeries.value, 600, 70));
 
     function getPresetLabel(p) {
       return p.labels[lang.value] || p.labels.en;
@@ -111,64 +115,19 @@ createApp({
       return `https://brouter.de/brouter-web/#map=13/${c.lat.toFixed(4)}/${c.lon.toFixed(4)}/OpenTopoMap&lonlats=${pts}&profile=${profile.value}&alternativeidx=${route.altIdx}`;
     }
 
-    function getMapyUrl() {
-      const midLat = (startStation.value.lat + endStation.value.lat) / 2;
-      const midLon = (startStation.value.lon + endStation.value.lon) / 2;
-      return `https://mapy.com/en/turisticka?x=${midLon.toFixed(4)}&y=${midLat.toFixed(4)}&z=13`;
-    }
+    async function loadInspiredTrailsForActive() {
+      if (wmtAbortCtrl) wmtAbortCtrl.abort();
+      inspiredTrails.value = [];
 
-    function drawStations() {
-      if (!stationLayerGroup) return;
-      stationLayerGroup.clearLayers();
-
-      for (const st of STATIONS) {
-        const isStart = st.id === startId.value;
-        const isEnd = st.id === endId.value;
-        const visible = operatorFilter.value === 'ALL' || st.operator === operatorFilter.value || isStart || isEnd;
-        if (!visible) continue;
-
-        let radius = 5;
-        let fillColor = OP_COLORS[st.operator] || '#334155';
-        let weight = 1.5;
-        let color = '#ffffff';
-
-        if (isStart) {
-          radius = 8.5;
-          fillColor = '#15803d';
-          weight = 2.5;
-        } else if (isEnd) {
-          radius = 8.5;
-          fillColor = '#b91c1c';
-          weight = 2.5;
-        }
-
-        const marker = L.circleMarker([st.lat, st.lon], {
-          radius,
-          fillColor,
-          color,
-          weight,
-          fillOpacity: 0.95
-        });
-
-        marker.bindTooltip(
-          `<b>${st.name}</b> <span style="opacity:.75">[${st.country} · ${st.operator} ${st.lines}]</span>`,
-          { direction: 'top', offset: [0, -6] }
-        );
-
-        marker.on('click', (e) => {
-          L.DomEvent.stopPropagation(e);
-          if (e.originalEvent.shiftKey) {
-            endId.value = st.id;
-          } else if (startId.value === st.id) {
-            return;
-          } else {
-            endId.value = st.id;
-          }
-          onManualStationChange();
-        });
-
-        marker.addTo(stationLayerGroup);
+      const rt = activeRoute.value;
+      // Only attribute NGO-marked trails if a meaningful share (>= 15%) of the route uses them
+      if (!rt || !rt.coords?.length || (rt.surfaces?.markedPct ?? 0) < 15) {
+        return;
       }
+
+      wmtAbortCtrl = new AbortController();
+      const list = await fetchCorridorTrails(rt.coords, wmtAbortCtrl.signal);
+      inspiredTrails.value = list;
     }
 
     function drawRailCorridors() {
@@ -183,12 +142,93 @@ createApp({
           .map((s) => [s.lat, s.lon]);
         if (latlngs.length < 2) continue;
 
+        // 1. Crisp white outer halo for visibility over topographic relief
         L.polyline(latlngs, {
-          color: corr.operator === 'KD' ? '#1e293b' : '#475569',
-          weight: 2,
-          opacity: 0.5,
-          dashArray: '5, 5'
+          color: '#ffffff',
+          weight: 6.5,
+          opacity: 0.85,
+          interactive: false
         }).addTo(railLayerGroup);
+
+        // 2. Dark railway track casing
+        L.polyline(latlngs, {
+          color: '#141416',
+          weight: 4,
+          opacity: 0.92,
+          interactive: false
+        }).addTo(railLayerGroup);
+
+        // 3. Operator-colored dashed inner line (classic rail style)
+        const dashLine = L.polyline(latlngs, {
+          color: OP_DASH_COLORS[corr.operator] || '#facc15',
+          weight: 2.2,
+          opacity: 0.98,
+          dashArray: '6, 6'
+        });
+        dashLine.bindTooltip(corr.name, { sticky: true });
+        dashLine.addTo(railLayerGroup);
+      }
+    }
+
+    function drawStations() {
+      if (!stationLayerGroup) return;
+      stationLayerGroup.clearLayers();
+
+      for (const st of STATIONS) {
+        const isStart = st.id === startId.value;
+        const isEnd = st.id === endId.value;
+        const visible = operatorFilter.value === 'ALL' || st.operator === operatorFilter.value || isStart || isEnd;
+        if (!visible) continue;
+
+        if (isStart || isEnd) {
+          const icon = L.divIcon({
+            className: '',
+            html: `<div class="station-pin ${isStart ? 'station-pin-a' : 'station-pin-b'}">${isStart ? 'A' : 'B'}</div>`,
+            iconSize: [26, 26],
+            iconAnchor: [13, 13]
+          });
+          const pin = L.marker([st.lat, st.lon], { icon, zIndexOffset: 900 });
+          pin.bindTooltip(
+            `<b>${isStart ? 'A · ' : 'B · '}${st.name}</b> <span style="opacity:.75">[${st.country} · ${st.operator} ${st.lines}]</span>`,
+            { direction: 'top', offset: [0, -12] }
+          );
+          pin.addTo(stationLayerGroup);
+          continue;
+        }
+
+        // White outer halo for strong separation from OpenTopoMap background
+        L.circleMarker([st.lat, st.lon], {
+          radius: 8.5,
+          fillColor: '#ffffff',
+          fillOpacity: 0.9,
+          stroke: false,
+          interactive: false
+        }).addTo(stationLayerGroup);
+
+        const marker = L.circleMarker([st.lat, st.lon], {
+          radius: 6,
+          fillColor: OP_COLORS[st.operator] || '#334155',
+          color: '#141416',
+          weight: 2.2,
+          fillOpacity: 1
+        });
+
+        marker.bindTooltip(
+          `<b>${st.name}</b> <span style="opacity:.75">[${st.country} · ${st.operator} ${st.lines}]</span>`,
+          { direction: 'top', offset: [0, -8] }
+        );
+
+        marker.on('click', (e) => {
+          L.DomEvent.stopPropagation(e);
+          if (e.originalEvent.shiftKey) {
+            startId.value = st.id;
+          } else if (startId.value !== st.id) {
+            endId.value = st.id;
+          }
+          onManualStationChange();
+        });
+
+        marker.addTo(stationLayerGroup);
       }
     }
 
@@ -197,10 +237,10 @@ createApp({
       viaLayerGroup.clearLayers();
       viaPoints.value.forEach((vp, idx) => {
         const m = L.circleMarker([vp.lat, vp.lon], {
-          radius: 7,
+          radius: 7.5,
           fillColor: '#f59e0b',
           color: '#141416',
-          weight: 2,
+          weight: 2.5,
           fillOpacity: 1
         });
         m.bindTooltip(`Via #${idx + 1}`, { direction: 'top' });
@@ -223,10 +263,21 @@ createApp({
       routes.value.forEach((rt, idx) => {
         const isActive = idx === activeRouteIdx.value;
         const latlngs = rt.coords.map(([lon, lat]) => [lat, lon]);
+
+        if (isActive) {
+          // Crisp white halo under active route
+          L.polyline(latlngs, {
+            color: '#ffffff',
+            weight: 8.5,
+            opacity: 0.9,
+            interactive: false
+          }).addTo(routeLayerGroup);
+        }
+
         const line = L.polyline(latlngs, {
           color: ROUTE_COLORS[idx % ROUTE_COLORS.length],
-          weight: isActive ? 5 : 3,
-          opacity: isActive ? 0.95 : 0.42
+          weight: isActive ? 5 : 3.2,
+          opacity: isActive ? 0.98 : 0.45
         });
         line.on('click', () => {
           activeRouteIdx.value = idx;
@@ -240,13 +291,14 @@ createApp({
         const bounds = L.latLngBounds(
           activeRoute.value.coords.map(([lon, lat]) => [lat, lon])
         );
-        map.fitBounds(bounds, { padding: [36, 36], maxZoom: 14 });
+        map.fitBounds(bounds, { padding: [42, 42], maxZoom: 14 });
       }
     }
 
     async function computeRoutes() {
       if (abortCtrl) abortCtrl.abort();
       routes.value = [];
+      inspiredTrails.value = [];
       activeRouteIdx.value = 0;
       hoverInfo.value = null;
       errorDetail.value = '';
@@ -277,6 +329,7 @@ createApp({
         activeRouteIdx.value = 0;
         routingStatus.value = 'ready';
         drawRoutes(true);
+        loadInspiredTrailsForActive();
       } catch (err) {
         if (err.name === 'AbortError') return;
         routingStatus.value = 'error';
@@ -336,6 +389,7 @@ createApp({
 
       L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
         maxZoom: 17,
+        className: 'otm-base-tiles',
         attribution: 'Map data: © OpenStreetMap contributors, SRTM | Style: © OpenTopoMap (CC-BY-SA)'
       }).addTo(map);
 
@@ -385,6 +439,7 @@ createApp({
 
     watch(activeRouteIdx, () => {
       drawRoutes(false);
+      loadInspiredTrailsForActive();
     });
 
     watch(activeTab, async (tab) => {
@@ -415,6 +470,7 @@ createApp({
       activeRoute,
       routingStatus,
       errorDetail,
+      inspiredTrails,
       hoverInfo,
       elevSvg,
       t,
@@ -432,7 +488,6 @@ createApp({
       removeVia,
       exportActiveGpx,
       getBrouterWebUrl,
-      getMapyUrl,
       onElevMove,
       onElevLeave
     };

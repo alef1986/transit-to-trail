@@ -8,5 +8,5 @@ export const RAIL_CORRIDORS = [
   { name: 'KD D29 (Kłodzko – Polanica – Duszniki – Kudowa-Zdrój)', operator: 'KD', ids: ['pl-klodzko-miasto', 'pl-polanica-zdroj', 'pl-szczytna', 'pl-duszniki-zdroj', 'pl-kudowa-zdroj'] },
   { name: 'KD D9 (Wrocław – Bardo – Kłodzko – Międzylesie – Lichkov)', operator: 'KD', ids: ['pl-bardo-slaskie', 'pl-klodzko-miasto', 'pl-bystrzyca-klodzka', 'pl-dlugopole-zdroj', 'pl-miedzylesie', 'cz-lichkov'] },
   { name: 'KD D10 / Trilex (Węgliniec – Zgorzelec – Görlitz – Zittau – Oybin)', operator: 'Trilex', ids: ['pl-boleslawiec', 'pl-wegliniec', 'pl-zgorzelec-miasto', 'pl-zgorzelec', 'de-goerlitz', 'de-hagenwerder', 'de-ostritz', 'de-zittau', 'de-bertsdorf', 'de-oybin'] },
-  { name: 'ČD / Trilex U28 & S1 (Stadt Wehlen – Bad Schandau – Schöna – Děčín)', operator: 'Trilex', ids: ['de-stadt-wehlen', 'de-kurort-rathen', 'de-koenigstein', 'de-bad-schandau', 'de-krippen', 'de-schoena', 'cz-dolni-zleb', 'cz-decin'] }
+  { name: 'ČD / Trilex U28 & S1 (Stadt Wehlen – Bad Schandau – Schöna – Děčín)', operator: 'CD', ids: ['de-stadt-wehlen', 'de-kurort-rathen', 'de-koenigstein', 'de-bad-schandau', 'de-krippen', 'de-schoena', 'cz-dolni-zleb', 'cz-decin'] }
 ];

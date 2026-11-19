@@ -15,7 +15,7 @@ export function buildElevationSeries(coords) {
   return series;
 }
 
-export function buildSvgPaths(series, width = 600, height = 74) {
+export function buildSvgPaths(series, width = 600, height = 70) {
   if (!series.length) return { linePath: '', areaPath: '', totalKm: 0, minEle: 0, maxEle: 0 };
   const totalKm = series[series.length - 1].km || 1;
   let minEle = Infinity;

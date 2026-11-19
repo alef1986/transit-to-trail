@@ -1,5 +1,5 @@
 export const STATIONS = [
-  // Koleje Dolnośląskie (PL) — Dolina Bobru, Karkonosze, Izery, Rudawy, Wałbrzych, Kłodzko, Ślęża, Zgorzelec
+  // Koleje Dolnośląskie (PL)
   { id: 'pl-pilchowice-zapora', name: 'Pilchowice Zapora', operator: 'KD', country: 'PL', lines: 'D13', lat: 50.9672, lon: 15.6365 },
   { id: 'pl-pilchowice-nielestno', name: 'Pilchowice Nielestno', operator: 'KD', country: 'PL', lines: 'D13', lat: 50.9924, lon: 15.6431 },
   { id: 'pl-wlen', name: 'Wleń', operator: 'KD', country: 'PL', lines: 'D13', lat: 51.0155, lon: 15.6708 },
@@ -69,7 +69,7 @@ export const STATIONS = [
   { id: 'pl-jawor', name: 'Jawor', operator: 'KD', country: 'PL', lines: 'D16', lat: 51.0504, lon: 16.2015 },
   { id: 'pl-strzegom', name: 'Strzegom', operator: 'KD', country: 'PL', lines: 'D16', lat: 50.9587, lon: 16.3455 },
 
-  // České dráhy (CZ) — Jizerské hory, Krkonoše, Adršpach, Orlické hory, České Švýcarsko
+  // České dráhy (CZ)
   { id: 'cz-harrachov', name: 'Harrachov', operator: 'CD', country: 'CZ', lines: 'L1', lat: 50.7851, lon: 15.4055 },
   { id: 'cz-korenov', name: 'Kořenov', operator: 'CD', country: 'CZ', lines: 'L1', lat: 50.7642, lon: 15.3679 },
   { id: 'cz-tanvald', name: 'Tanvald', operator: 'CD', country: 'CZ', lines: 'L1', lat: 50.7372, lon: 15.3075 },
@@ -93,7 +93,7 @@ export const STATIONS = [
   { id: 'cz-rybniste', name: 'Rybniště', operator: 'CD', country: 'CZ', lines: 'U8, L4', lat: 50.8805, lon: 14.5131 },
   { id: 'cz-jedlova', name: 'Jedlová', operator: 'CD', country: 'CZ', lines: 'L4', lat: 50.8588, lon: 14.5682 },
 
-  // Trilex / ZVON / S-Bahn Dresden (DE) — Oberlausitz, Zittauer Gebirge, Sächsische Schweiz
+  // Trilex / ZVON / S-Bahn Dresden (DE)
   { id: 'de-goerlitz', name: 'Görlitz', operator: 'Trilex', country: 'DE', lines: 'RE1, RB65, D10', lat: 51.1489, lon: 14.9801 },
   { id: 'de-hagenwerder', name: 'Hagenwerder', operator: 'Trilex', country: 'DE', lines: 'RB65', lat: 51.0641, lon: 14.9612 },
   { id: 'de-ostritz', name: 'Ostritz', operator: 'Trilex', country: 'DE', lines: 'RB65', lat: 51.0085, lon: 14.9412 },

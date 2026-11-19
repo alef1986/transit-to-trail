@@ -189,10 +189,29 @@
               <span>● {{ t.surfPaved }} {{ rt.surfaces.pavedPct }}%</span>
             </div>
 
+            <!-- Official NGO-marked trails used in this corridor (shown on active route when markedPct >= 15%) -->
+            <div class="inspired-box" v-if="activeRouteIdx === idx && inspiredTrails.length" @click.stop>
+              <div class="inspired-label">{{ t.inspiredByLabel }}</div>
+              <div class="inspired-chips">
+                <a
+                  v-for="tr in inspiredTrails"
+                  :key="tr.id"
+                  :href="tr.url"
+                  target="_blank"
+                  rel="noopener"
+                  class="trail-link-chip"
+                  :title="tr.name"
+                >
+                  <span class="trail-color-dot" :style="{ background: tr.color }"></span>
+                  <span class="trail-link-name">{{ tr.name }}</span>
+                  <span>↗</span>
+                </a>
+              </div>
+            </div>
+
             <div class="card-actions" @click.stop>
               <button class="action-btn primary" @click="exportActiveGpx(rt)">⬇ {{ t.exportGpx }}</button>
               <a class="action-btn" :href="getBrouterWebUrl(rt)" target="_blank" rel="noopener">↗ {{ t.openBrouter }}</a>
-              <a class="action-btn" :href="getMapyUrl()" target="_blank" rel="noopener">↗ {{ t.openMapy }}</a>
             </div>
           </div>
         </div>
@@ -200,18 +219,21 @@
 
       <!-- Map + Docked Elevation Profile -->
       <section class="map-stage">
-        <div id="map"></div>
+        <div class="map-canvas-wrap">
+          <div id="map"></div>
 
-        <div class="map-overlay-card">
-          <label><input type="checkbox" v-model="showWaymarked" /> {{ t.waymarkedOverlay }}</label>
-          <label><input type="checkbox" v-model="showRailCorridors" /> {{ t.railOverlay }}</label>
-        </div>
+          <div class="map-overlay-card">
+            <label><input type="checkbox" v-model="showWaymarked" /> {{ t.waymarkedOverlay }}</label>
+            <label><input type="checkbox" v-model="showRailCorridors" /> {{ t.railOverlay }}</label>
+          </div>
 
-        <div class="map-legend">
-          <span class="legend-item"><span class="dot" style="background:#ca8a04"></span> {{ t.legendKD }}</span>
-          <span class="legend-item"><span class="dot" style="background:#1d4ed8"></span> {{ t.legendCD }}</span>
-          <span class="legend-item"><span class="dot" style="background:#0f766e"></span> {{ t.legendDE }}</span>
-          <span class="legend-item"><span class="legend-line" style="background:#d97706"></span> {{ t.legendRoute }}</span>
+          <div class="map-legend">
+            <span class="legend-item"><span class="dot" style="background:#eab308; border:1px solid #fff"></span> {{ t.legendKD }}</span>
+            <span class="legend-item"><span class="dot" style="background:#2563eb; border:1px solid #fff"></span> {{ t.legendCD }}</span>
+            <span class="legend-item"><span class="dot" style="background:#0d9488; border:1px solid #fff"></span> {{ t.legendDE }}</span>
+            <span class="legend-item"><span class="legend-rail"></span> {{ t.legendRail }}</span>
+            <span class="legend-item"><span class="legend-line" style="background:#ea580c"></span> {{ t.legendRoute }}</span>
+          </div>
         </div>
 
         <div class="elevation-dock" v-if="activeRoute">
@@ -223,7 +245,7 @@
           <div class="elev-svg-wrap">
             <svg
               class="elev-svg"
-              viewBox="0 0 600 72"
+              viewBox="0 0 600 70"
               preserveAspectRatio="none"
               @mousemove="onElevMove"
               @mouseleave="onElevLeave"
@@ -235,7 +257,7 @@
                 :x1="hoverInfo.x"
                 y1="0"
                 :x2="hoverInfo.x"
-                y2="72"
+                y2="70"
                 stroke="#141416"
                 stroke-width="1.5"
                 stroke-dasharray="3,2"
