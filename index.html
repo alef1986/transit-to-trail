@@ -120,7 +120,7 @@
 
           <div class="via-chips" v-if="viaPoints.length">
             <span class="via-chip" v-for="(vp, i) in viaPoints" :key="i">
-              Via #{{ i + 1 }} ({{ vp.lat.toFixed(3) }}, {{ vp.lon.toFixed(3) }})
+              <span>{{ vp.label ? '🧲 ' + vp.label : `Via #${i + 1} (${vp.lat.toFixed(3)}, ${vp.lon.toFixed(3)})` }}</span>
               <button @click="removeVia(i)">×</button>
             </span>
           </div>
@@ -184,22 +184,51 @@
               <span>● {{ t.surfPaved }} {{ rt.surfaces.pavedPct }}%</span>
             </div>
 
-            <div class="inspired-box" v-if="activeRouteIdx === idx && inspiredTrails.length" @click.stop>
-              <div class="inspired-label">{{ t.inspiredByLabel }}</div>
-              <div class="inspired-chips">
-                <a
-                  v-for="tr in inspiredTrails"
+            <div class="corridor-box" v-if="activeRouteIdx === idx" @click.stop>
+              <div class="corridor-head">
+                <span>{{ t.inspiredByLabel }}</span>
+                <span v-if="corridorLoading">{{ t.corridorLoading }}</span>
+              </div>
+
+              <div class="corridor-list" v-if="corridorTrails.length">
+                <div
+                  v-for="tr in corridorTrails"
                   :key="tr.id"
-                  :href="tr.url"
-                  target="_blank"
-                  rel="noopener"
-                  class="trail-link-chip"
-                  :title="tr.name"
+                  class="corridor-row"
+                  :class="{ previewing: previewTrailId === tr.id }"
                 >
-                  <span class="trail-color-dot" :style="{ background: tr.color }"></span>
-                  <span class="trail-link-name">{{ tr.name }}</span>
-                  <span>↗</span>
-                </a>
+                  <button
+                    class="corridor-name-btn"
+                    :title="tr.name"
+                    @click="togglePreviewTrail(tr)"
+                  >
+                    <span class="trail-color-dot" :style="{ background: tr.color }"></span>
+                    <span class="corridor-name-text">{{ tr.name }}</span>
+                  </button>
+
+                  <div class="corridor-btns">
+                    <button
+                      class="mini-btn steer"
+                      :title="t.steerTitle"
+                      :disabled="steeringTrailId === tr.id"
+                      @click="steerRouteViaTrail(tr)"
+                    >
+                      🧲 {{ steeringTrailId === tr.id ? '…' : t.steerBtn }}
+                    </button>
+                    <a
+                      class="mini-btn"
+                      :href="tr.url"
+                      target="_blank"
+                      rel="noopener"
+                      :title="tr.name"
+                    >
+                      ↗
+                    </a>
+                  </div>
+                </div>
+              </div>
+              <div class="corridor-empty" v-else-if="!corridorLoading">
+                {{ t.corridorEmpty }}
               </div>
             </div>
 

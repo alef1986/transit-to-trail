@@ -5,7 +5,7 @@ import { REGION_PRESETS } from './data/presets.js';
 import { STAKEHOLDERS, EFFORT_STYLE } from './data/stakeholders.js';
 import { I18N } from './i18n.js';
 import { fetchBRouterAlternatives, haversineKm, formatDuration } from './services/brouter.js';
-import { fetchCorridorTrails } from './services/waymarked.js';
+import { fetchCorridorTrails, fetchTrailGeometry, pickSteerPoint } from './services/waymarked.js';
 import { downloadRouteGpx } from './utils/gpx.js';
 import { buildElevationSeries, buildSvgPaths } from './utils/elevation.js';
 
@@ -33,11 +33,16 @@ createApp({
     const routingStatus = ref('ready');
     const errorDetail = ref('');
 
-    const inspiredTrails = ref([]);
+    // Corridor marked trails (preview & steer)
+    const corridorTrails = ref([]);
+    const corridorLoading = ref(false);
+    const previewTrailId = ref(null);
+    const steeringTrailId = ref(null);
+
     const hoverInfo = ref(null);
 
     // Stakeholder Map State
-    const lifecyclePhase = ref('pilot'); // 'pilot' | 'ops'
+    const lifecyclePhase = ref('pilot');
     const selectedStakeholderId = ref('university');
 
     let map = null;
@@ -45,6 +50,7 @@ createApp({
     let railLayerGroup = null;
     let stationLayerGroup = null;
     let routeLayerGroup = null;
+    let previewTrailLayerGroup = null;
     let viaLayerGroup = null;
     let hoverMarker = null;
     let abortCtrl = null;
@@ -81,10 +87,7 @@ createApp({
       const loc = st.i18n[lang.value] || st.i18n.en;
       const effKey = st.effort[lifecyclePhase.value];
       const effStyle = EFFORT_STYLE[effKey] || EFFORT_STYLE.low;
-      return {
-        short: loc.short,
-        color: effStyle.color
-      };
+      return { short: loc.short, color: effStyle.color };
     }
 
     const filteredStations = computed(() => {
@@ -117,6 +120,7 @@ createApp({
       if (!preset) return;
       operatorFilter.value = 'ALL';
       viaPoints.value = [];
+      clearTrailPreview();
       startId.value = preset.startId;
       endId.value = preset.endId;
       profile.value = preset.profile || 'hiking-mountain';
@@ -153,18 +157,82 @@ createApp({
       return `https://brouter.de/brouter-web/#map=13/${c.lat.toFixed(4)}/${c.lon.toFixed(4)}/OpenTopoMap&lonlats=${pts}&profile=${profile.value}&alternativeidx=${route.altIdx}`;
     }
 
-    async function loadInspiredTrailsForActive() {
-      if (wmtAbortCtrl) wmtAbortCtrl.abort();
-      inspiredTrails.value = [];
+    function clearTrailPreview() {
+      previewTrailId.value = null;
+      if (previewTrailLayerGroup) previewTrailLayerGroup.clearLayers();
+    }
 
-      const rt = activeRoute.value;
-      if (!rt || !rt.coords?.length || (rt.surfaces?.markedPct ?? 0) < 15) {
+    async function togglePreviewTrail(trail) {
+      if (previewTrailId.value === trail.id) {
+        clearTrailPreview();
         return;
       }
+      clearTrailPreview();
+      previewTrailId.value = trail.id;
+      try {
+        const segments = await fetchTrailGeometry(trail.id);
+        if (previewTrailId.value !== trail.id || !previewTrailLayerGroup) return;
+        for (const seg of segments) {
+          L.polyline(seg, {
+            color: '#0f172a',
+            weight: 7,
+            opacity: 0.7,
+            interactive: false
+          }).addTo(previewTrailLayerGroup);
+          L.polyline(seg, {
+            color: '#06b6d4',
+            weight: 3.5,
+            opacity: 0.98,
+            dashArray: '8, 5'
+          })
+            .bindTooltip(`<b>${trail.name}</b>`, { sticky: true })
+            .addTo(previewTrailLayerGroup);
+        }
+      } catch {
+        clearTrailPreview();
+      }
+    }
 
+    async function steerRouteViaTrail(trail) {
+      steeringTrailId.value = trail.id;
+      try {
+        const segments = await fetchTrailGeometry(trail.id);
+        const pt = pickSteerPoint(segments, startStation.value, endStation.value);
+        if (pt) {
+          // Replace any previous trail-steer via point or append a new one
+          const existingIdx = viaPoints.value.findIndex((v) => v.trailId === trail.id);
+          if (existingIdx >= 0) {
+            viaPoints.value.splice(existingIdx, 1);
+          } else {
+            viaPoints.value.push({
+              lat: pt.lat,
+              lon: pt.lon,
+              label: trail.name,
+              trailId: trail.id
+            });
+          }
+          // Also highlight the trail on map for visual confirmation
+          if (previewTrailId.value !== trail.id) {
+            await togglePreviewTrail(trail);
+          }
+        }
+      } finally {
+        steeringTrailId.value = null;
+      }
+    }
+
+    async function loadCorridorTrailsForActive() {
+      if (wmtAbortCtrl) wmtAbortCtrl.abort();
+      corridorTrails.value = [];
+
+      const rt = activeRoute.value;
+      if (!rt || !rt.coords?.length) return;
+
+      corridorLoading.value = true;
       wmtAbortCtrl = new AbortController();
-      const list = await fetchCorridorTrails(rt.coords, wmtAbortCtrl.signal);
-      inspiredTrails.value = list;
+      const { trails } = await fetchCorridorTrails(rt.coords, wmtAbortCtrl.signal);
+      corridorTrails.value = trails;
+      corridorLoading.value = false;
     }
 
     function drawRailCorridors() {
@@ -173,34 +241,44 @@ createApp({
       if (!showRailCorridors.value) return;
 
       for (const corr of RAIL_CORRIDORS) {
-        const latlngs = corr.ids
-          .map((id) => stationMap.get(id))
-          .filter(Boolean)
-          .map((s) => [s.lat, s.lon]);
-        if (latlngs.length < 2) continue;
+        // Supports BOTH real curved `segments` (from scripts/fetch_rail_data.py) and legacy `ids`
+        let segmentList = [];
+        if (Array.isArray(corr.segments) && corr.segments.length) {
+          segmentList = corr.segments;
+        } else if (Array.isArray(corr.ids) && corr.ids.length >= 2) {
+          const pts = corr.ids
+            .map((id) => stationMap.get(id))
+            .filter(Boolean)
+            .map((s) => [s.lat, s.lon]);
+          if (pts.length >= 2) segmentList = [pts];
+        }
 
-        L.polyline(latlngs, {
-          color: '#ffffff',
-          weight: 6.5,
-          opacity: 0.85,
-          interactive: false
-        }).addTo(railLayerGroup);
+        for (const latlngs of segmentList) {
+          if (latlngs.length < 2) continue;
 
-        L.polyline(latlngs, {
-          color: '#141416',
-          weight: 4,
-          opacity: 0.92,
-          interactive: false
-        }).addTo(railLayerGroup);
+          L.polyline(latlngs, {
+            color: '#ffffff',
+            weight: 6.2,
+            opacity: 0.85,
+            interactive: false
+          }).addTo(railLayerGroup);
 
-        const dashLine = L.polyline(latlngs, {
-          color: OP_DASH_COLORS[corr.operator] || '#facc15',
-          weight: 2.2,
-          opacity: 0.98,
-          dashArray: '6, 6'
-        });
-        dashLine.bindTooltip(corr.name, { sticky: true });
-        dashLine.addTo(railLayerGroup);
+          L.polyline(latlngs, {
+            color: '#141416',
+            weight: 3.8,
+            opacity: 0.92,
+            interactive: false
+          }).addTo(railLayerGroup);
+
+          const dashLine = L.polyline(latlngs, {
+            color: OP_DASH_COLORS[corr.operator] || '#facc15',
+            weight: 2.1,
+            opacity: 0.98,
+            dashArray: '6, 6'
+          });
+          dashLine.bindTooltip(corr.name, { sticky: true });
+          dashLine.addTo(railLayerGroup);
+        }
       }
     }
 
@@ -231,18 +309,18 @@ createApp({
         }
 
         L.circleMarker([st.lat, st.lon], {
-          radius: 8.5,
+          radius: 8,
           fillColor: '#ffffff',
-          fillOpacity: 0.9,
+          fillOpacity: 0.88,
           stroke: false,
           interactive: false
         }).addTo(stationLayerGroup);
 
         const marker = L.circleMarker([st.lat, st.lon], {
-          radius: 6,
+          radius: 5.5,
           fillColor: OP_COLORS[st.operator] || '#334155',
           color: '#141416',
-          weight: 2.2,
+          weight: 2,
           fillOpacity: 1
         });
 
@@ -271,12 +349,12 @@ createApp({
       viaPoints.value.forEach((vp, idx) => {
         const m = L.circleMarker([vp.lat, vp.lon], {
           radius: 7.5,
-          fillColor: '#f59e0b',
+          fillColor: vp.trailId ? '#06b6d4' : '#f59e0b',
           color: '#141416',
           weight: 2.5,
           fillOpacity: 1
         });
-        m.bindTooltip(`Via #${idx + 1}`, { direction: 'top' });
+        m.bindTooltip(vp.label ? `Via: ${vp.label}` : `Via #${idx + 1}`, { direction: 'top' });
         m.on('click', (e) => {
           L.DomEvent.stopPropagation(e);
           removeVia(idx);
@@ -330,7 +408,7 @@ createApp({
     async function computeRoutes() {
       if (abortCtrl) abortCtrl.abort();
       routes.value = [];
-      inspiredTrails.value = [];
+      corridorTrails.value = [];
       activeRouteIdx.value = 0;
       hoverInfo.value = null;
       errorDetail.value = '';
@@ -361,7 +439,7 @@ createApp({
         activeRouteIdx.value = 0;
         routingStatus.value = 'ready';
         drawRoutes(true);
-        loadInspiredTrailsForActive();
+        loadCorridorTrailsForActive();
       } catch (err) {
         if (err.name === 'AbortError') return;
         routingStatus.value = 'error';
@@ -433,6 +511,7 @@ createApp({
       if (showWaymarked.value) waymarkedLayer.addTo(map);
 
       railLayerGroup = L.layerGroup().addTo(map);
+      previewTrailLayerGroup = L.layerGroup().addTo(map);
       routeLayerGroup = L.layerGroup().addTo(map);
       viaLayerGroup = L.layerGroup().addTo(map);
       stationLayerGroup = L.layerGroup().addTo(map);
@@ -471,7 +550,7 @@ createApp({
 
     watch(activeRouteIdx, () => {
       drawRoutes(false);
-      loadInspiredTrailsForActive();
+      loadCorridorTrailsForActive();
     });
 
     watch(activeTab, async (tab) => {
@@ -502,7 +581,10 @@ createApp({
       activeRoute,
       routingStatus,
       errorDetail,
-      inspiredTrails,
+      corridorTrails,
+      corridorLoading,
+      previewTrailId,
+      steeringTrailId,
       hoverInfo,
       elevSvg,
       lifecyclePhase,
@@ -525,6 +607,8 @@ createApp({
       removeVia,
       exportActiveGpx,
       getBrouterWebUrl,
+      togglePreviewTrail,
+      steerRouteViaTrail,
       onElevMove,
       onElevLeave
     };
