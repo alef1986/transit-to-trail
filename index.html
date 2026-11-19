@@ -474,6 +474,15 @@
           </div>
         </div>
 
+        <!-- How This Demonstrator Actually Works (Static Datasets vs. Live Routing) -->
+        <div class="info-card" style="border-left: 4px solid var(--gold);">
+          <h3>ℹ️ {{ t.demoHowTitle }}</h3>
+          <p style="margin: 0 0 8px;">{{ t.demoHowIntro }}</p>
+          <ul>
+            <li v-for="(item, i) in t.demoHowItems" :key="i">{{ item }}</li>
+          </ul>
+        </div>
+
         <!-- Three-Layer Open-Data Architecture -->
         <div class="info-grid">
           <div class="info-card">

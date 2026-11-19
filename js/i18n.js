@@ -1,5 +1,12 @@
 export const I18N = {
   en: {
+    demoHowTitle: 'How This Demonstrator Actually Works (Static Datasets vs. Live Routing)',
+    demoHowIntro: 'To stay fast, zero-backend, and immune to browser CORS/rate-limit blocks during live demos, this prototype separates offline data preparation from live route calculation:',
+    demoHowItems: [
+      'Railway stations & curved tracks (js/data/stations.js, js/data/railLines.js): Pre-packaged static datasets extracted via scripts/fetch_rail_data.py from OpenStreetMap (Overpass API) and regional rail networks (KD, ČD, Trilex/ZVON) — not fetched on every page load.',
+      'Marked hiking trails in corridor (js/data/hikingTrails.js): Pre-packaged static trail geometries extracted via scripts/fetch_trails_data.py from OSM route=hiking relations (PTTK, KČT, Saxon trails). Clicking a trail previews it on the map; Steer injects a waypoint so BRouter bends the itinerary onto that trail.',
+      'Live routing & relief tiles: BRouter (brouter.de) computes station-to-station hiking/trekking routes on demand, while OpenTopoMap and Waymarked Trails supply map and trail tiles.'
+    ],
     subtitle: 'Cross-Border Rail & Trail Commons (PL · CZ · DE)',
     tabMap: 'Map & Planner',
     tabModel: 'Data & Socio-Tech Model',
@@ -104,6 +111,13 @@ export const I18N = {
   },
 
   pl: {
+    demoHowTitle: 'Jak naprawdę działa ten demonstrator (dane statyczne vs. wyznaczanie tras)',
+    demoHowIntro: 'Aby demonstrator działał szybko, bez backendu i bez błędów CORS w przeglądarce, rozdziela on przygotowanie danych od bieżącego wyznaczania trasy:',
+    demoHowItems: [
+      'Stacje i linie kolejowe (js/data/stations.js, js/data/railLines.js): Statyczne dane przygotowane skryptem scripts/fetch_rail_data.py na bazie OpenStreetMap (Overpass API) i sieci KD, ČD oraz Trilex/ZVON — nie są pobierane przy każdym odświeżeniu strony.',
+      'Szlaki znakowane w korytarzu (js/data/hikingTrails.js): Statyczny zestaw szlaków wygenerowany skryptem scripts/fetch_trails_data.py z relacji OSM route=hiking (PTTK, KČT, szlaki saksońskie). Kliknięcie pokazuje podgląd na mapie, a „Dopasuj” (Steer) kieruje trasę BRouter na ten szlak.',
+      'Wyznaczanie tras i kafelki mapy: Silnik BRouter (brouter.de) liczy trasy na żywo między stacjami, a OpenTopoMap oraz Waymarked Trails dostarczają podkład topograficzny i warstwę szlaków.'
+    ],
     subtitle: 'Transgraniczny framework kolejowo-turystyczny (PL · CZ · DE)',
     tabMap: 'Mapa i Planer',
     tabModel: 'Dane i Model Socjotechniczny',
@@ -208,6 +222,13 @@ export const I18N = {
   },
 
   cs: {
+    demoHowTitle: 'Jak tento demonstrátor skutečně funguje (statická data vs. živý routing)',
+    demoHowIntro: 'Aby demonstrátor běžel rychle, bez vlastního serveru a bez problémů s CORS v prohlížeči, odděluje předpřipravená data od výpočtu trasy:',
+    demoHowItems: [
+      'Železniční stanice a tratě (js/data/stations.js, js/data/railLines.js): Statická data připravená skriptem scripts/fetch_rail_data.py z OpenStreetMap (Overpass API) a sítí KD, ČD a Trilex/ZVON — nenačítají se při každém otevření stránky.',
+      'Značené trasy v koridoru (js/data/hikingTrails.js): Statická vrstva tras připravená skriptem scripts/fetch_trails_data.py z OSM route=hiking (KČT, PTTK, saské trasy). Kliknutím zobrazíte náhled, tlačítkem „Navést“ (Steer) přitáhnete trasu BRouter na vybranou stezku.',
+      'Živý výpočet tras a mapové dlaždice: BRouter (brouter.de) počítá trasy za běhu, zatímco OpenTopoMap a Waymarked Trails zajišťují mapový podklad.'
+    ],
     subtitle: 'Přeshraniční železniční a turistický framework (PL · CZ · DE)',
     tabMap: 'Mapa a Plánovač',
     tabModel: 'Data a Sociotechnický Model',
@@ -312,6 +333,13 @@ export const I18N = {
   },
 
   de: {
+    demoHowTitle: 'Wie dieser Demonstrator tatsächlich funktioniert (statische Daten vs. Live-Routing)',
+    demoHowIntro: 'Für schnelle Ladezeiten, Zero-Backend-Betrieb und Schutz vor Browser-CORS-Blockaden trennt der Prototyp die Datenvorbereitung strikt vom Live-Routing:',
+    demoHowItems: [
+      'Bahnhöfe & Bahnstrecken (js/data/stations.js, js/data/railLines.js): Statische Datensätze, erzeugt mit scripts/fetch_rail_data.py aus OpenStreetMap (Overpass API) und den Netzen von KD, ČD und Trilex/ZVON — kein Neuladen bei jedem Seitenaufruf.',
+      'Markierte Wanderwege im Korridor (js/data/hikingTrails.js): Statischer Wegerahmen, erzeugt mit scripts/fetch_trails_data.py aus OSM route=hiking (PTTK, KČT, sächsische Wege). Klick zeigt die Vorschau auf der Karte, „Anpassen“ (Steer) zieht die BRouter-Route auf den Weg.',
+      'Live-Routing & Kartenkacheln: BRouter (brouter.de) berechnet die Routen dynamisch zwischen den Bahnhöfen, OpenTopoMap und Waymarked Trails liefern Relief und Wegemarkierungen.'
+    ],
     subtitle: 'Grenzüberschreitendes Bahn- & Wander-Framework (PL · CZ · DE)',
     tabMap: 'Karte & Planer',
     tabModel: 'Daten & Soziotechnisches Modell',
