@@ -1,0 +1,2216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neisse–Nysa–Nisa Rail-to-Trail • Cross-Border Socio-Technical GIS (PL–CZ–DE)</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            obsidian: '#141416',
+            graphite: '#1c1c20',
+            surface: '#242429',
+            gold: {
+              DEFAULT: '#d4af37',
+              light: '#e8c966',
+              dark: '#a8871e',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', system-ui, sans-serif;
+      background-color: #141416;
+      color: #f4f4f5;
+    }
+
+    /* Dark custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #141416;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #3f3f46;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #52525b;
+    }
+
+    /* Station markers */
+    .station-marker-wrapper {
+      background: transparent;
+      border: none;
+    }
+    .station-pin {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 9999px;
+      color: #ffffff;
+      border: 2px solid #ffffff;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+      font-size: 8px;
+      font-weight: 700;
+      transition: transform 0.15s ease;
+    }
+    .station-pin.op-kd {
+      background: #141416;
+      border-color: #d4af37;
+      color: #facc15;
+    }
+    .station-pin.op-cd {
+      background: #0369a1;
+      border-color: #e0f2fe;
+    }
+    .station-pin.op-trilex {
+      background: #047857;
+      border-color: #d1fae5;
+    }
+    .station-pin:hover {
+      transform: scale(1.25);
+      z-index: 900;
+    }
+    .station-pin.is-start {
+      width: 30px;
+      height: 30px;
+      background: #10b981 !important;
+      border: 3px solid #ffffff !important;
+      color: #ffffff !important;
+      font-size: 12px;
+      box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.35), 0 4px 10px rgba(0, 0, 0, 0.45);
+    }
+    .station-pin.is-end {
+      width: 30px;
+      height: 30px;
+      background: #ef4444 !important;
+      border: 3px solid #ffffff !important;
+      color: #ffffff !important;
+      font-size: 12px;
+      box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.35), 0 4px 10px rgba(0, 0, 0, 0.45);
+    }
+    .station-pin.is-both {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #10b981 50%, #ef4444 50%) !important;
+      border: 3px solid #d4af37 !important;
+      color: #ffffff !important;
+      font-size: 10px;
+      box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.4), 0 4px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Via-point marker */
+    .via-pin {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 9999px;
+      background: #d4af37;
+      color: #141416;
+      border: 2.5px solid #141416;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.35), 0 3px 8px rgba(0, 0, 0, 0.45);
+    }
+
+    /* Crosshair cursor when adding via-points */
+    .map-via-cursor {
+      cursor: crosshair !important;
+    }
+
+    /* Leaflet popup dark styling */
+    .leaflet-popup-content-wrapper {
+      background: #1c1c20;
+      color: #f4f4f5;
+      border: 1px solid #3f3f46;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.55);
+    }
+    .leaflet-popup-tip {
+      background: #1c1c20;
+      border: 1px solid #3f3f46;
+    }
+    .leaflet-popup-close-button {
+      color: #a1a1aa !important;
+    }
+    .leaflet-popup-close-button:hover {
+      color: #ffffff !important;
+    }
+
+    @font-face {
+      font-family: 'TwemojiLocal';
+      src: url('./Twemoji-16.0.1.ttf') format('truetype');
+      font-display: swap;
+    }
+
+    .lang-flag {
+      font-family: 'TwemojiLocal', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
+      font-size: 1.05rem;
+      line-height: 1;
+    }
+  </style>
+</head>
+<body class="overflow-hidden flex flex-col h-screen">
+  <div id="app" class="flex flex-col h-full w-full">
+
+    <!-- TOP NAVIGATION BAR -->
+    <header class="bg-obsidian text-white border-b border-zinc-800 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0 z-30 shadow-lg">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-gold to-gold-dark flex items-center justify-center text-obsidian font-bold shadow-inner shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>
+            <line x1="4" y1="22" x2="4" y2="15"></line>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-sm sm:text-base font-bold tracking-tight text-white">
+              Neisse–Nysa–Nisa <span class="text-gold">Rail-to-Trail</span>
+            </h1>
+            <span class="hidden xl:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-graphite text-gold border border-gold/30">
+              {{ stations.length }} {{ t('stationsCountLabel') }} • BRouter Engine
+            </span>
+          </div>
+          <p class="text-[11px] text-zinc-400 hidden md:block">
+            {{ t('appSubtitle') }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Right Controls: 4-Language Switcher + View Mode Switcher -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <!-- 4-Language Switcher (PL / CS / DE / EN) -->
+        <div class="bg-graphite p-0.5 rounded-lg border border-zinc-800 flex items-center" role="group" aria-label="Language switcher">
+          <button
+            v-for="langItem in languages"
+            :key="langItem.code"
+            @click="setLanguage(langItem.code)"
+            :class="lang === langItem.code
+              ? 'bg-zinc-800 text-gold font-bold shadow-xs border border-gold/30'
+              : 'text-zinc-400 hover:text-white border border-transparent'"
+            class="px-2 py-1 rounded-md text-[11px] font-mono transition-all flex items-center gap-1"
+            :title="langItem.fullName"
+          >
+            <span>{{ langItem.flag }}</span>
+            <span>{{ langItem.code.toUpperCase() }}</span>
+          </button>
+        </div>
+
+        <!-- View Mode Switcher -->
+        <div class="bg-graphite p-0.5 rounded-lg border border-zinc-800 flex items-center">
+          <button
+            @click="activeView = 'map'"
+            :class="activeView === 'map' ? 'bg-gold text-obsidian font-semibold shadow-sm' : 'text-zinc-300 hover:text-white'"
+            class="px-2.5 py-1 rounded-md text-xs transition-all flex items-center gap-1.5"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+              <line x1="8" y1="2" x2="8" y2="18"></line>
+              <line x1="16" y1="6" x2="16" y2="22"></line>
+            </svg>
+            <span>{{ t('navMap') }}</span>
+          </button>
+          <button
+            @click="activeView = 'architecture'"
+            :class="activeView === 'architecture' ? 'bg-gold text-obsidian font-semibold shadow-sm' : 'text-zinc-300 hover:text-white'"
+            class="px-2.5 py-1 rounded-md text-xs transition-all flex items-center gap-1.5"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+            </svg>
+            <span>{{ t('navArchitecture') }}</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN CONTENT: MAP & BROUTER COMBINED HIKING PLANNER -->
+    <main v-show="activeView === 'map'" class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+
+      <!-- LEFT SIDEBAR (Matte Dark Obsidian) -->
+      <aside class="w-full lg:w-[445px] xl:w-[480px] bg-obsidian border-b lg:border-b-0 lg:border-r border-zinc-800 flex flex-col h-[55%] lg:h-full shrink-0 z-10 shadow-xl">
+
+        <!-- Station Selection & Controls -->
+        <div class="p-3.5 border-b border-zinc-800 bg-graphite/70 space-y-2.5 shrink-0">
+          <!-- Presets Row -->
+          <div class="flex items-center justify-between gap-1.5 flex-wrap">
+            <h2 class="text-[11px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-gold"></span>
+              {{ t('plannerTitle') }}
+            </h2>
+            <div class="flex items-center gap-1 flex-wrap">
+              <button
+                v-for="preset in presets"
+                :key="preset.key"
+                @click="applyPreset(preset)"
+                class="text-[10px] px-2 py-0.5 rounded-md bg-surface border border-zinc-700 hover:border-gold hover:text-gold text-zinc-200 font-medium transition"
+              >
+                {{ preset.label[lang] || preset.label.en }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Operator Filter -->
+          <div class="flex items-center gap-1 flex-wrap">
+            <span class="text-[10px] text-zinc-500 mr-0.5">{{ t('operatorLabel') }}:</span>
+            <button
+              v-for="op in operatorFilters"
+              :key="op.id"
+              @click="selectedOperator = op.id"
+              :class="selectedOperator === op.id
+                ? 'bg-gold text-obsidian border-gold font-semibold'
+                : 'bg-surface text-zinc-300 border-zinc-700/80 hover:border-zinc-500'"
+              class="px-2 py-0.5 rounded-md text-[10px] border transition"
+            >
+              {{ op.label }}
+            </button>
+          </div>
+
+          <!-- Station A & Station B Selectors -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2">
+            <!-- Start Station (A) -->
+            <div class="bg-obsidian p-2.5 rounded-xl border border-zinc-800">
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-[11px] font-semibold text-emerald-400 flex items-center gap-1.5">
+                  <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-obsidian text-[10px] font-bold">A</span>
+                  {{ t('startStationLabel') }}
+                </label>
+                <span v-if="startStation" class="text-[10px] font-mono px-1.5 py-0.2 bg-surface text-zinc-300 rounded border border-zinc-700">
+                  {{ startStation.country }} • {{ startStation.operator }} ({{ startStation.lines.join(', ') }})
+                </span>
+              </div>
+              <select
+                v-model="startStationId"
+                class="w-full text-xs font-medium text-zinc-100 bg-graphite border border-zinc-700 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-emerald-500"
+              >
+                <option value="">{{ t('selectStartPlaceholder') }}</option>
+                <option v-for="st in filteredStations" :key="st.id" :value="st.id">
+                  [{{ st.country }}] {{ st.name }} ({{ st.operator }} • {{ st.lines.join(', ') }})
+                </option>
+              </select>
+            </div>
+
+            <!-- End Station (B) -->
+            <div class="bg-obsidian p-2.5 rounded-xl border border-zinc-800">
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-[11px] font-semibold text-rose-400 flex items-center gap-1.5">
+                  <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-bold">B</span>
+                  {{ t('endStationLabel') }}
+                </label>
+                <button
+                  v-if="startStationId && endStationId"
+                  @click="swapStations"
+                  class="text-[10px] text-zinc-400 hover:text-gold flex items-center gap-0.5 font-medium transition"
+                >
+                  ⇄ {{ t('swapStations') }}
+                </button>
+              </div>
+              <select
+                v-model="endStationId"
+                class="w-full text-xs font-medium text-zinc-100 bg-graphite border border-zinc-700 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-rose-500"
+              >
+                <option value="">{{ t('selectEndPlaceholder') }}</option>
+                <option v-for="st in filteredStations" :key="st.id" :value="st.id">
+                  [{{ st.country }}] {{ st.name }} ({{ st.operator }} • {{ st.lines.join(', ') }})
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <!-- BRouter Profile Switcher & Via-Point Toggle -->
+          <div class="flex flex-col gap-2 pt-0.5">
+            <div class="grid grid-cols-2 gap-1.5">
+              <button
+                @click="selectedProfile = 'hiking-mountain'"
+                :class="selectedProfile === 'hiking-mountain'
+                  ? 'bg-gold/15 border-gold text-gold font-semibold'
+                  : 'bg-obsidian border-zinc-800 text-zinc-400 hover:text-zinc-200'"
+                class="px-2.5 py-1.5 rounded-lg border text-[11px] text-left transition flex flex-col"
+              >
+                <span>🥾 {{ t('profileMountainTitle') }}</span>
+                <span class="text-[9.5px] opacity-80 font-normal truncate">{{ t('profileMountainSub') }}</span>
+              </button>
+              <button
+                @click="selectedProfile = 'trekking'"
+                :class="selectedProfile === 'trekking'
+                  ? 'bg-gold/15 border-gold text-gold font-semibold'
+                  : 'bg-obsidian border-zinc-800 text-zinc-400 hover:text-zinc-200'"
+                class="px-2.5 py-1.5 rounded-lg border text-[11px] text-left transition flex flex-col"
+              >
+                <span>🌲 {{ t('profileTrekkingTitle') }}</span>
+                <span class="text-[9.5px] opacity-80 font-normal truncate">{{ t('profileTrekkingSub') }}</span>
+              </button>
+            </div>
+
+            <!-- Via-Point Toolbar -->
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <button
+                @click="addingViaPoint = !addingViaPoint"
+                :class="addingViaPoint
+                  ? 'bg-gold text-obsidian font-semibold shadow-sm'
+                  : 'bg-surface text-zinc-200 border border-zinc-700 hover:border-gold'"
+                class="px-2.5 py-1 rounded-lg text-[11px] transition flex items-center gap-1.5"
+                :title="t('viaPointHint')"
+              >
+                <span>📍</span>
+                <span>{{ addingViaPoint ? t('viaPointActiveBtn') : t('addViaPointBtn') }}</span>
+              </button>
+              <span class="text-[10px] text-zinc-500 hidden sm:inline">{{ t('shiftClickHint') }}</span>
+              <button
+                v-if="viaPoints.length > 0"
+                @click="clearViaPoints"
+                class="text-[10px] text-rose-400 hover:text-rose-300 font-medium ml-auto"
+              >
+                {{ t('clearViaPointsBtn') }} ({{ viaPoints.length }})
+              </button>
+            </div>
+
+            <!-- Via-Point Chips -->
+            <div v-if="viaPoints.length > 0" class="flex items-center gap-1.5 flex-wrap">
+              <span
+                v-for="(vp, idx) in viaPoints"
+                :key="vp.id"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gold/15 border border-gold/40 text-gold text-[10px] font-mono"
+              >
+                <span>Via {{ idx + 1 }}: {{ vp.lat.toFixed(3) }}, {{ vp.lng.toFixed(3) }}</span>
+                <button @click="removeViaPoint(vp.id)" class="hover:text-white font-bold ml-0.5 px-0.5" aria-label="Remove via point">×</button>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cross-Border Ticket Banner -->
+        <div v-if="ticketHint" class="px-3.5 py-2 bg-obsidian border-b border-zinc-800 flex items-center justify-between gap-2 shrink-0">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="px-1.5 py-0.5 rounded bg-gold/20 text-gold font-mono text-[10px] font-bold shrink-0">
+              {{ ticketHint.badge }}
+            </span>
+            <span class="text-[11px] text-zinc-300 truncate" :title="ticketHint.text">
+              {{ ticketHint.text }}
+            </span>
+          </div>
+          <span class="text-[10px] font-mono text-zinc-500 shrink-0">{{ straightLineKm.toFixed(1) }} km ✈</span>
+        </div>
+
+        <!-- Route Results & Elevation Profile Scroll Area -->
+        <div class="flex-1 overflow-y-auto p-3 space-y-2.5 bg-obsidian">
+
+          <!-- Loading State -->
+          <div v-if="routingLoading" class="bg-graphite border border-zinc-800 rounded-xl p-5 flex flex-col items-center justify-center gap-2.5 text-center">
+            <div class="w-6 h-6 border-2 border-gold border-t-transparent rounded-full animate-spin"></div>
+            <div class="text-xs font-medium text-zinc-200">{{ t('calculatingRoutes') }}</div>
+            <div class="text-[10px] font-mono text-zinc-500">BRouter ({{ selectedProfile }}) • {{ startStation?.name }} → {{ endStation?.name }}</div>
+          </div>
+
+          <!-- Long Distance (> 75 km) Guard Warning -->
+          <div v-else-if="longDistanceWarning" class="bg-amber-950/40 border border-amber-600/50 rounded-xl p-4 space-y-2.5">
+            <div class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+              <span>⚠️</span>
+              <span>{{ t('longDistTitle', { km: straightLineKm.toFixed(0) }) }}</span>
+            </div>
+            <p class="text-[11px] text-amber-100/80 leading-relaxed">
+              {{ t('longDistBody') }}
+            </p>
+            <button
+              @click="routeLongDistanceAnyway"
+              class="px-3 py-1.5 rounded-lg bg-gold text-obsidian text-xs font-semibold hover:bg-gold-light transition"
+            >
+              {{ t('routeAnywayBtn') }}
+            </button>
+          </div>
+
+          <!-- Error Fallback State -->
+          <div v-else-if="routingError" class="bg-rose-950/30 border border-rose-700/50 rounded-xl p-4 space-y-2.5">
+            <div class="text-xs font-bold text-rose-300">{{ t('routingErrorTitle') }}</div>
+            <p class="text-[11px] text-zinc-300 leading-relaxed">{{ routingError }}</p>
+            <div class="flex flex-wrap gap-2 pt-1">
+              <button
+                @click="fetchBRouterRoutes(true)"
+                class="px-2.5 py-1 rounded-lg bg-surface border border-zinc-700 text-xs text-zinc-200 hover:border-gold transition"
+              >
+                ↻ {{ t('retryBtn') }}
+              </button>
+              <a
+                v-if="fallbackExternalLinks"
+                :href="fallbackExternalLinks.brouter"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="px-2.5 py-1 rounded-lg bg-gold text-obsidian text-xs font-semibold hover:bg-gold-light transition"
+              >
+                ↗ BRouter-Web
+              </a>
+              <a
+                v-if="fallbackExternalLinks"
+                :href="fallbackExternalLinks.mapy"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 transition"
+              >
+                ↗ Mapy.com
+              </a>
+            </div>
+          </div>
+
+          <!-- Same Station / Missing Station Prompt -->
+          <div v-else-if="!startStation || !endStation" class="bg-graphite border border-dashed border-zinc-700 rounded-xl p-5 text-center space-y-1.5">
+            <div class="text-xs font-semibold text-zinc-200">{{ t('selectBothTitle') }}</div>
+            <p class="text-[11px] text-zinc-400">{{ t('selectBothBody') }}</p>
+          </div>
+
+          <div v-else-if="startStation.id === endStation.id && viaPoints.length === 0" class="bg-graphite border border-dashed border-gold/40 rounded-xl p-4 text-center space-y-2">
+            <div class="text-xs font-semibold text-gold">{{ t('loopNeedsViaTitle') }}</div>
+            <p class="text-[11px] text-zinc-300">{{ t('loopNeedsViaBody') }}</p>
+            <button
+              @click="addingViaPoint = true"
+              class="px-3 py-1.5 rounded-lg bg-gold text-obsidian text-xs font-semibold hover:bg-gold-light transition"
+            >
+              📍 {{ t('addViaPointBtn') }}
+            </button>
+          </div>
+
+          <!-- Route Alternative Cards -->
+          <template v-else-if="routes.length > 0">
+            <div class="flex items-center justify-between px-0.5">
+              <span class="text-[11px] font-semibold text-zinc-400">
+                {{ t('alternativesFound', { count: routes.length }) }}
+              </span>
+              <span class="text-[10px] font-mono text-zinc-500">
+                {{ t('clickToSelectRoute') }}
+              </span>
+            </div>
+
+            <div
+              v-for="(route, idx) in routes"
+              :key="route.id"
+              @click="selectRoute(idx)"
+              :class="selectedRouteIdx === idx
+                ? 'border-gold bg-graphite ring-1 ring-gold/40 shadow-lg'
+                : 'border-zinc-800 bg-graphite/50 hover:border-zinc-700'"
+              class="rounded-xl border p-3 cursor-pointer transition-all space-y-2.5"
+            >
+              <!-- Card Header -->
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span
+                    class="w-3 h-3 rounded-full shrink-0 border border-white/60"
+                    :style="{ backgroundColor: routeColors[idx] || '#e11d48' }"
+                  ></span>
+                  <span class="text-xs font-bold text-white">
+                    {{ idx === 0 ? t('primaryRouteLabel') : t('alternativeRouteLabel', { n: idx }) }}
+                  </span>
+                </div>
+                <span class="text-[11px] font-mono font-bold text-gold">
+                  ⏱ {{ route.durationText }}
+                </span>
+              </div>
+
+              <!-- Key Telemetry Metrics -->
+              <div class="grid grid-cols-4 gap-1.5 text-center">
+                <div class="bg-obsidian/90 rounded-lg py-1.5 px-1 border border-zinc-800">
+                  <div class="text-[9.5px] text-zinc-500 uppercase">{{ t('metricDist') }}</div>
+                  <div class="text-xs font-mono font-bold text-white">{{ route.distanceKm.toFixed(1) }} km</div>
+                </div>
+                <div class="bg-obsidian/90 rounded-lg py-1.5 px-1 border border-zinc-800">
+                  <div class="text-[9.5px] text-zinc-500 uppercase">{{ t('metricAscent') }}</div>
+                  <div class="text-xs font-mono font-bold text-emerald-400">+{{ route.ascentM }} m</div>
+                </div>
+                <div class="bg-obsidian/90 rounded-lg py-1.5 px-1 border border-zinc-800">
+                  <div class="text-[9.5px] text-zinc-500 uppercase">{{ t('metricDescent') }}</div>
+                  <div class="text-xs font-mono font-bold text-rose-400">-{{ route.descentM }} m</div>
+                </div>
+                <div class="bg-obsidian/90 rounded-lg py-1.5 px-1 border border-zinc-800">
+                  <div class="text-[9.5px] text-zinc-500 uppercase">{{ t('metricMaxEle') }}</div>
+                  <div class="text-xs font-mono font-bold text-amber-300">{{ route.maxEle }} m</div>
+                </div>
+              </div>
+
+              <!-- Trail & Surface Breakdown Bar -->
+              <div class="space-y-1">
+                <div class="h-2 w-full rounded-full overflow-hidden flex bg-zinc-800">
+                  <div
+                    v-if="route.breakdown.markedPct > 0"
+                    :style="{ width: route.breakdown.markedPct + '%' }"
+                    class="bg-rose-500 h-full"
+                    :title="t('surfaceMarked') + ': ' + route.breakdown.markedPct + '%'"
+                  ></div>
+                  <div
+                    v-if="route.breakdown.forestPct > 0"
+                    :style="{ width: route.breakdown.forestPct + '%' }"
+                    class="bg-emerald-500 h-full"
+                    :title="t('surfaceForest') + ': ' + route.breakdown.forestPct + '%'"
+                  ></div>
+                  <div
+                    v-if="route.breakdown.pavedPct > 0"
+                    :style="{ width: route.breakdown.pavedPct + '%' }"
+                    class="bg-zinc-400 h-full"
+                    :title="t('surfacePaved') + ': ' + route.breakdown.pavedPct + '%'"
+                  ></div>
+                </div>
+                <div class="flex items-center justify-between text-[10px] text-zinc-400 flex-wrap gap-1">
+                  <span class="flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>
+                    {{ t('surfaceMarked') }} <strong class="text-zinc-200">{{ route.breakdown.markedPct }}%</strong>
+                  </span>
+                  <span class="flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                    {{ t('surfaceForest') }} <strong class="text-zinc-200">{{ route.breakdown.forestPct }}%</strong>
+                  </span>
+                  <span class="flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-zinc-400 inline-block"></span>
+                    {{ t('surfacePaved') }} <strong class="text-zinc-200">{{ route.breakdown.pavedPct }}%</strong>
+                  </span>
+                </div>
+              </div>
+
+              <!-- Expanded Active Route Panel: Interactive SVG Elevation Profile + Export & External Links -->
+              <div v-if="selectedRouteIdx === idx" class="pt-2 border-t border-zinc-800 space-y-2.5" @click.stop>
+                <!-- Interactive SVG Elevation Profile -->
+                <div class="bg-obsidian rounded-lg p-2.5 border border-zinc-800">
+                  <div class="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
+                    <span class="font-semibold text-zinc-300">{{ t('elevationProfileTitle') }}</span>
+                    <span class="font-mono">
+                      <template v-if="hoverPoint">
+                        <span class="text-gold font-bold">{{ hoverPoint.distKm.toFixed(1) }} km</span> •
+                        <span class="text-white font-bold">{{ Math.round(hoverPoint.ele) }} m</span>
+                      </template>
+                      <template v-else>
+                        {{ route.minEle }} m – {{ route.maxEle }} m
+                      </template>
+                    </span>
+                  </div>
+
+                  <div class="relative w-full h-24 select-none">
+                    <svg
+                      viewBox="0 0 360 96"
+                      preserveAspectRatio="none"
+                      class="w-full h-full overflow-visible cursor-crosshair"
+                      @mousemove="onProfileHover($event, route)"
+                      @touchmove.prevent="onProfileHover($event, route)"
+                      @mouseleave="clearProfileHover"
+                      @touchend="clearProfileHover"
+                    >
+                      <defs>
+                        <linearGradient id="eleFillGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stop-color="#d4af37" stop-opacity="0.45" />
+                          <stop offset="100%" stop-color="#d4af37" stop-opacity="0.02" />
+                        </linearGradient>
+                      </defs>
+
+                      <!-- Horizontal Grid Lines -->
+                      <line x1="0" y1="12" x2="360" y2="12" stroke="#27272a" stroke-width="1" stroke-dasharray="3,3" />
+                      <line x1="0" y1="48" x2="360" y2="48" stroke="#27272a" stroke-width="1" stroke-dasharray="3,3" />
+                      <line x1="0" y1="84" x2="360" y2="84" stroke="#27272a" stroke-width="1" />
+
+                      <!-- Area Fill & Elevation Line -->
+                      <path :d="route.svgAreaPath" fill="url(#eleFillGrad)" />
+                      <path :d="route.svgLinePath" fill="none" stroke="#d4af37" stroke-width="2" stroke-linejoin="round" />
+
+                      <!-- Hover Crosshair -->
+                      <g v-if="hoverPoint">
+                        <line :x1="hoverPoint.svgX" y1="4" :x2="hoverPoint.svgX" y2="84" stroke="#ffffff" stroke-width="1" stroke-dasharray="2,2" />
+                        <circle :cx="hoverPoint.svgX" :cy="hoverPoint.svgY" r="4" fill="#e11d48" stroke="#ffffff" stroke-width="1.5" />
+                      </g>
+                    </svg>
+                  </div>
+                  <div class="flex justify-between text-[9px] font-mono text-zinc-500 mt-0.5">
+                    <span>0 km (A)</span>
+                    <span>{{ (route.distanceKm / 2).toFixed(1) }} km</span>
+                    <span>{{ route.distanceKm.toFixed(1) }} km (B)</span>
+                  </div>
+                </div>
+
+                <!-- Export & External Deep Links -->
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    @click="downloadGpx(route)"
+                    class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gold hover:bg-gold-light text-obsidian text-[11px] font-bold transition shadow-xs"
+                  >
+                    <span>⬇ {{ t('downloadGpxBtn') }}</span>
+                  </button>
+                  <a
+                    :href="route.links.brouter"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-surface hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-[10px] font-medium transition"
+                  >
+                    <span>↗ BRouter-Web</span>
+                  </a>
+                  <a
+                    :href="route.links.mapy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/60 text-[10px] font-medium transition"
+                  >
+                    <span>↗ Mapy.com</span>
+                  </a>
+                  <a
+                    :href="route.links.waymarked"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-surface hover:bg-zinc-700 text-zinc-300 border border-zinc-700 text-[10px] font-medium transition"
+                  >
+                    <span>↗ Waymarked</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </aside>
+
+      <!-- RIGHT AREA: INTERACTIVE OPENTOPOMAP -->
+      <section class="flex-1 relative h-[45%] lg:h-full bg-zinc-900">
+        <div id="map" :class="{ 'map-via-cursor': addingViaPoint }" class="w-full h-full z-0"></div>
+
+        <!-- Via-Point Placement Hint Pill -->
+        <div
+          v-if="addingViaPoint"
+          class="absolute top-3 left-1/2 -translate-x-1/2 z-[500] bg-obsidian/95 text-gold border border-gold/60 px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-lg flex items-center gap-2"
+        >
+          <span>📍 {{ t('clickMapToAddVia') }}</span>
+          <button @click="addingViaPoint = false" class="text-zinc-400 hover:text-white ml-1">✕</button>
+        </div>
+
+        <!-- Top-Right Map Layer Control -->
+        <div class="absolute top-3 right-3 z-[500] bg-obsidian/95 backdrop-blur-xs rounded-xl shadow-lg border border-zinc-700/80 p-2.5 flex flex-col gap-1.5 max-w-[235px]">
+          <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 flex items-center justify-between gap-2">
+            <span>OpenTopoMap</span>
+            <span class="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[9px] border border-emerald-500/30">RELIEF</span>
+          </div>
+          <label class="flex items-center gap-2 pt-1 text-[11px] text-zinc-200 cursor-pointer border-t border-zinc-800 select-none">
+            <input type="checkbox" v-model="showWaymarkedOverlay" @change="toggleWaymarkedLayer" class="rounded bg-graphite border-zinc-600 text-gold focus:ring-gold" />
+            <span>{{ t('waymarkedOverlayLabel') }}</span>
+          </label>
+          <div class="text-[9.5px] leading-tight text-zinc-400">
+            {{ t('waymarkedOverlayHint') }}
+          </div>
+        </div>
+
+        <!-- Bottom-Left Compact Map Legend -->
+        <div class="hidden sm:block absolute bottom-4 left-3 z-[500] bg-obsidian/90 backdrop-blur-xs rounded-xl border border-zinc-700/80 p-2.5 text-[10px] text-zinc-300 space-y-1 shadow-lg">
+          <div class="font-bold text-zinc-100 uppercase tracking-wider text-[9.5px] mb-1">{{ t('legendTitle') }}</div>
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-emerald-500 border border-white inline-block"></span>
+            <span>{{ t('legendStart') }}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-rose-500 border border-white inline-block"></span>
+            <span>{{ t('legendEnd') }}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-5 h-1 rounded bg-rose-600 inline-block"></span>
+            <span>{{ t('legendPrimary') }}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-5 h-0.5 border-t-2 border-dashed border-blue-500 inline-block"></span>
+            <span>{{ t('legendAlt') }}</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- SOCIO-TECHNICAL & OPEN DATA ARCHITECTURE VIEW -->
+    <main v-show="activeView === 'architecture'" class="flex-1 overflow-y-auto bg-obsidian p-4 sm:p-6 lg:p-8">
+      <div class="max-w-6xl mx-auto space-y-6">
+
+        <!-- Hero Banner -->
+        <div class="bg-graphite text-white rounded-2xl p-6 sm:p-8 shadow-xl border border-zinc-800">
+          <div class="max-w-4xl space-y-3">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-obsidian border border-gold/40 text-gold text-xs font-mono">
+              Socio-Technical Systems Engineering • Euroregion Neisse–Nysa–Nisa (PL–CZ–DE)
+            </div>
+            <h2 class="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-white">
+              {{ t('archHeroTitle') }}
+            </h2>
+            <p class="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+              {{ t('archHeroBody') }}
+            </p>
+          </div>
+        </div>
+
+        <!-- 3 Layers of the Loosely Coupled Socio-Technical Architecture -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div class="bg-graphite rounded-2xl p-5 border border-zinc-800 space-y-3">
+            <span class="px-2.5 py-1 rounded-lg bg-gold/15 text-gold border border-gold/30 font-mono text-[10px] font-bold inline-block">
+              LAYER 1 • INSTITUTIONAL & TARIFF
+            </span>
+            <h3 class="text-base font-bold text-white">{{ t('layer1Title') }}</h3>
+            <p class="text-xs text-zinc-300 leading-relaxed">{{ t('layer1Body') }}</p>
+            <ul class="text-[11px] text-zinc-400 space-y-1 pt-1">
+              <li>• <strong class="text-zinc-200">EURO-NEISSE-Ticket+</strong> (ZVON / IDOL / KD)</li>
+              <li>• <strong class="text-zinc-200">Elbe-Labe-Ticket</strong> (VVO / DÚK)</li>
+              <li>• <strong class="text-zinc-200">PTTK / KČT / SachsenForst</strong> stewardship</li>
+            </ul>
+          </div>
+
+          <div class="bg-graphite rounded-2xl p-5 border border-zinc-800 space-y-3">
+            <span class="px-2.5 py-1 rounded-lg bg-sky-500/15 text-sky-300 border border-sky-500/30 font-mono text-[10px] font-bold inline-block">
+              LAYER 2 • BOUNDARY OBJECTS
+            </span>
+            <h3 class="text-base font-bold text-white">{{ t('layer2Title') }}</h3>
+            <p class="text-xs text-zinc-300 leading-relaxed">{{ t('layer2Body') }}</p>
+            <ul class="text-[11px] text-zinc-400 space-y-1 pt-1">
+              <li>• <strong class="text-zinc-200">Rail:</strong> GTFS / NeTEx (<code>dane.gov.pl</code>, CIS JŘ, DELFI/VVO)</li>
+              <li>• <strong class="text-zinc-200">Trails:</strong> OSM <code>route=hiking</code> + <code>osmc:symbol</code></li>
+              <li>• <strong class="text-zinc-200">Governance:</strong> Zero proprietary API lock-in</li>
+            </ul>
+          </div>
+
+          <div class="bg-graphite rounded-2xl p-5 border border-zinc-800 space-y-3">
+            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono text-[10px] font-bold inline-block">
+              LAYER 3 • COMBINED ROUTING CORE
+            </span>
+            <h3 class="text-base font-bold text-white">{{ t('layer3Title') }}</h3>
+            <p class="text-xs text-zinc-300 leading-relaxed">{{ t('layer3Body') }}</p>
+            <ul class="text-[11px] text-zinc-400 space-y-1 pt-1">
+              <li>• <strong class="text-zinc-200">Engine:</strong> BRouter (<code>hiking-mountain</code> profile)</li>
+              <li>• <strong class="text-zinc-200">Stitching:</strong> Seamless multi-colour trail transitions</li>
+              <li>• <strong class="text-zinc-200">Edge UI:</strong> Buildless Vue 3 + GPX + Elevation SVG</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Institutional Interface Matrix -->
+        <div class="bg-graphite rounded-2xl p-6 border border-zinc-800 space-y-4">
+          <div class="flex items-center justify-between flex-wrap gap-2 border-b border-zinc-800 pb-3">
+            <div>
+              <span class="text-[10px] font-mono font-bold uppercase tracking-wider text-gold">OPEN INTERFACES & MINIMAL INSTITUTIONAL FRICTION</span>
+              <h3 class="text-lg font-bold text-white">{{ t('matrixTitle') }}</h3>
+            </div>
+            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs font-mono font-semibold">
+              GTFS + OSM + BRouter
+            </span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="border-b border-zinc-700 text-zinc-400 font-mono text-[10px] uppercase">
+                  <th class="py-2 pr-4">{{ t('colActor') }}</th>
+                  <th class="py-2 pr-4">{{ t('colExistingDuty') }}</th>
+                  <th class="py-2 pr-4">{{ t('colBoundaryObj') }}</th>
+                  <th class="py-2">{{ t('colBenefit') }}</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-800 text-zinc-300">
+                <tr>
+                  <td class="py-2.5 pr-4 font-semibold text-white">Koleje Dolnośląskie / ČD / Trilex</td>
+                  <td class="py-2.5 pr-4">{{ t('rowRailDuty') }}</td>
+                  <td class="py-2.5 pr-4 font-mono text-[11px] text-gold">GTFS / NeTEx</td>
+                  <td class="py-2.5">{{ t('rowRailBenefit') }}</td>
+                </tr>
+                <tr>
+                  <td class="py-2.5 pr-4 font-semibold text-white">PTTK / KČT / SachsenForst</td>
+                  <td class="py-2.5 pr-4">{{ t('rowClubDuty') }}</td>
+                  <td class="py-2.5 pr-4 font-mono text-[11px] text-emerald-400">OSM route=hiking</td>
+                  <td class="py-2.5">{{ t('rowClubBenefit') }}</td>
+                </tr>
+                <tr>
+                  <td class="py-2.5 pr-4 font-semibold text-white">Euroregion Neisse / Municipalities</td>
+                  <td class="py-2.5 pr-4">{{ t('rowMuniDuty') }}</td>
+                  <td class="py-2.5 pr-4 font-mono text-[11px] text-sky-400">Static Edge Portal</td>
+                  <td class="py-2.5">{{ t('rowMuniBenefit') }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Back to Map CTA -->
+        <div class="flex justify-end">
+          <button
+            @click="activeView = 'map'"
+            class="px-5 py-2.5 rounded-xl bg-gold text-obsidian text-xs font-bold hover:bg-gold-light transition flex items-center gap-2 shadow-md"
+          >
+            <span>{{ t('backToMapBtn') }}</span>
+            <span>→</span>
+          </button>
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- VUE 3 APPLICATION (BUILDLESS ES MODULE) -->
+  <script type="module">
+    import { createApp, ref, computed, watch, onMounted, nextTick } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+
+    createApp({
+      setup() {
+        // 4-Language Support (PL / CS / DE / EN)
+        const lang = ref('en');
+        const languages = [
+          { code: 'pl', flag: '🇵🇱', fullName: 'Polski' },
+          { code: 'cs', flag: '🇨🇿', fullName: 'Čeština' },
+          { code: 'de', flag: '🇩🇪', fullName: 'Deutsch' },
+          { code: 'en', flag: '🇬🇧', fullName: 'English' },
+        ];
+
+        const translations = {
+          en: {
+            appSubtitle: 'Socio-Technical GIS: Regional Rail (KD / ČD / Trilex) × Combined Trail Routing (BRouter)',
+            stationsCountLabel: 'stations',
+            navMap: 'Map & Combined Planner',
+            navArchitecture: 'Data & Socio-Tech Model',
+            plannerTitle: 'Rail-to-Trail Planner',
+            operatorLabel: 'Operator',
+            startStationLabel: 'Start Railway Station (A)',
+            endStationLabel: 'End Railway Station (B)',
+            selectStartPlaceholder: '— Select start station (or click map) —',
+            selectEndPlaceholder: '— Select end station (or click map) —',
+            swapStations: 'Swap',
+            profileMountainTitle: 'Marked Trails',
+            profileMountainSub: 'PTTK & KČT Priority (hiking-mountain)',
+            profileTrekkingTitle: 'Valleys & Tracks',
+            profileTrekkingSub: 'Easier forest roads (trekking)',
+            addViaPointBtn: 'Add Via-Point on Map',
+            viaPointActiveBtn: 'Click Map to Place Via-Point...',
+            viaPointHint: 'Insert an intermediate peak or viewpoint between Station A and Station B',
+            shiftClickHint: 'Tip: Shift + Click map',
+            clearViaPointsBtn: 'Clear Via-Points',
+            clickMapToAddVia: 'Click anywhere on the map to insert a Via-Point',
+            calculatingRoutes: 'Calculating combined trail routes...',
+            longDistTitle: 'Multi-day distance ({km} km straight-line)',
+            longDistBody: 'Stations A and B are over 75 km apart. Calculating a multi-day hiking route may take longer or exceed BRouter web timeouts.',
+            routeAnywayBtn: 'Route anyway',
+            routingErrorTitle: 'Could not compute route via BRouter API',
+            retryBtn: 'Retry',
+            selectBothTitle: 'Select Start (A) and End (B) stations',
+            selectBothBody: 'Choose stations from the dropdowns or click any railway pin on the map to generate a combined trail hike.',
+            loopNeedsViaTitle: 'Circular hike selected',
+            loopNeedsViaBody: 'Station A and B are identical. Add at least one Via-Point (peak or landmark) on the map to build a circular rail-to-rail loop.',
+            alternativesFound: '{count} combined route option(s)',
+            clickToSelectRoute: 'Click card or track to inspect',
+            primaryRouteLabel: 'Primary Trail Route',
+            alternativeRouteLabel: 'Alternative #{n}',
+            metricDist: 'Distance',
+            metricAscent: 'Ascent',
+            metricDescent: 'Descent',
+            metricMaxEle: 'Max Alt',
+            surfaceMarked: 'Marked Trails',
+            surfaceForest: 'Forest Paths',
+            surfacePaved: 'Paved / Roads',
+            elevationProfileTitle: 'Elevation Profile (hover to locate on map)',
+            downloadGpxBtn: 'Download GPX',
+            waymarkedOverlayLabel: 'Waymarked Trails Overlay',
+            waymarkedOverlayHint: 'Live PTTK, KČT & Saxon trail blazes that BRouter follows.',
+            legendTitle: 'Map Legend',
+            legendStart: 'Start Station (A)',
+            legendEnd: 'End Station (B)',
+            legendPrimary: 'Active Combined Route',
+            legendAlt: 'Alternative Route',
+            popupMakeStart: 'Set as Start (A)',
+            popupMakeEnd: 'Set as End (B)',
+            ticketPlOnly: 'Koleje Dolnośląskie (KD Regional / KD Weekend Ticket)',
+            ticketCzOnly: 'České dráhy / IDOL Regional Ticket (Jízdenka)',
+            ticketDeOnly: 'ZVON / VVO Regional Tariff (Deutschlandticket valid)',
+            ticketPlCz: 'EURO-NEISSE-Ticket+ or KD+ČD Cross-Border Ticket',
+            ticketPlDe: 'EURO-NEISSE-Ticket+ (KD + Trilex / ZVON)',
+            ticketCzDe: 'EURO-NEISSE-Ticket+ / Elbe-Labe-Ticket (ČD + VVO/Trilex)',
+            archHeroTitle: 'Loosely Coupled Socio-Technical Framework for Cross-Border Rail & Hiking',
+            archHeroBody: 'Designed for minimal institutional friction across Lower Silesia (PL), Saxony (DE), and Northern Bohemia (CZ). Instead of building an expensive centralised IT monopoly, this architecture reuses existing cross-border tariff treaties and open data boundary objects, stitching marked trails dynamically on the client side via BRouter.',
+            layer1Title: 'Institutional & Tariff Reuse (Zero New Bureaucracy)',
+            layer1Body: 'Levers existing cross-border agreements (EURO-NEISSE-Ticket+, Elbe-Labe-Ticket, KD/ČD/Trilex reciprocity) and existing trail maintenance by PTTK, KČT, and SachsenForst without requiring new bilateral legal entities.',
+            layer2Title: 'Open Data Boundary Objects',
+            layer2Body: 'Railway operators simply maintain standard open GTFS / NeTEx feeds (dane.gov.pl, CIS JŘ, DELFI/VVO), while tourist clubs keep OSM route=hiking + osmc:symbol relations updated. Neither side alters internal workflows.',
+            layer3Title: 'Client-Side Combined Routing Engine',
+            layer3Body: 'BRouter (hiking-mountain profile) dynamically stitches multi-colour marked trails across national and institutional borders between any two rail platforms—solving the "single-trail limitation" without a proprietary backend.',
+            matrixTitle: 'Stakeholder Interface Matrix (Low Investment, High Output)',
+            colActor: 'Institution',
+            colExistingDuty: 'Existing Mandate (Unchanged)',
+            colBoundaryObj: 'Shared Interface',
+            colBenefit: 'Institutional Value',
+            rowRailDuty: 'Operate regional trains & publish timetables',
+            rowRailBenefit: 'Higher weekend off-peak ridership to mountain trailheads',
+            rowClubDuty: 'Maintain physical blazes & OSM hiking relations',
+            rowClubBenefit: 'Direct public-transit accessibility to less-crowded trails',
+            rowMuniDuty: 'Promote sustainable regional tourism',
+            rowMuniBenefit: 'Zero-backend cross-border portal with minimal upkeep cost',
+            backToMapBtn: 'Return to Interactive Map',
+          },
+          pl: {
+            appSubtitle: 'System socjotechniczny GIS: Kolej regionalna (KD / ČD / Trilex) × Łączone trasy piesze (BRouter)',
+            stationsCountLabel: 'stacji',
+            navMap: 'Mapa i planer tras',
+            navArchitecture: 'Dane i model socjotechniczny',
+            plannerTitle: 'Planer: Od stacji do stacji',
+            operatorLabel: 'Przewoźnik',
+            startStationLabel: 'Stacja początkowa (A)',
+            endStationLabel: 'Stacja końcowa (B)',
+            selectStartPlaceholder: '— Wybierz stację startową (lub kliknij mapę) —',
+            selectEndPlaceholder: '— Wybierz stację końcową (lub kliknij mapę) —',
+            swapStations: 'Zamień',
+            profileMountainTitle: 'Szlaki znakowane',
+            profileMountainSub: 'Priorytet PTTK i KČT (hiking-mountain)',
+            profileTrekkingTitle: 'Doliny i drogi leśne',
+            profileTrekkingSub: 'Łatwiejsze ścieżki (trekking)',
+            addViaPointBtn: 'Dodaj punkt pośredni (Via)',
+            viaPointActiveBtn: 'Kliknij mapę, aby dodać punkt...',
+            viaPointHint: 'Dodaj szczyt lub punkt widokowy pomiędzy stacją A i B',
+            shiftClickHint: 'Wskazówka: Shift + Klik na mapie',
+            clearViaPointsBtn: 'Wyczyść punkty Via',
+            clickMapToAddVia: 'Kliknij dowolne miejsce na mapie, aby wstawić punkt pośredni',
+            calculatingRoutes: 'Wyznaczanie łączonej trasy pieszej...',
+            longDistTitle: 'Trasa wielodniowa ({km} km w linii prostej)',
+            longDistBody: 'Stacje A i B dzieli ponad 75 km. Wyznaczanie tak długiej trasy pieszej może potrwać dłużej lub przekroczyć limit serwera BRouter.',
+            routeAnywayBtn: 'Wyznacz mimo to',
+            routingErrorTitle: 'Nie udało się wyznaczyć trasy przez BRouter API',
+            retryBtn: 'Spróbuj ponownie',
+            selectBothTitle: 'Wybierz stację początkową (A) i końcową (B)',
+            selectBothBody: 'Wskaż stacje na liście lub kliknij znaczniki kolejowe na mapie, aby wyznaczyć łączony szlak.',
+            loopNeedsViaTitle: 'Wybrano pętlę (ta sama stacja A i B)',
+            loopNeedsViaBody: 'Dodaj przynajmniej jeden punkt pośredni (Via) na mapie, aby utworzyć okrężną trasę powrotną do stacji.',
+            alternativesFound: 'Znalezione warianty trasy: {count}',
+            clickToSelectRoute: 'Kliknij kartę lub ślad na mapie',
+            primaryRouteLabel: 'Główna trasa piesza',
+            alternativeRouteLabel: 'Wariant alternatywny #{n}',
+            metricDist: 'Dystans',
+            metricAscent: 'Podejścia',
+            metricDescent: 'Zejścia',
+            metricMaxEle: 'Maks. wys.',
+            surfaceMarked: 'Szlaki znakowane',
+            surfaceForest: 'Ścieżki leśne',
+            surfacePaved: 'Asfalt / drogi',
+            elevationProfileTitle: 'Profil wysokościowy (najedź, aby wskazać na mapie)',
+            downloadGpxBtn: 'Pobierz GPX',
+            waymarkedOverlayLabel: 'Warstwa Waymarked Trails',
+            waymarkedOverlayHint: 'Rzeczywiste szlaki PTTK, KČT i Saksonii, po których prowadzi BRouter.',
+            legendTitle: 'Legenda mapy',
+            legendStart: 'Stacja początkowa (A)',
+            legendEnd: 'Stacja końcowa (B)',
+            legendPrimary: 'Aktywna trasa łączona',
+            legendAlt: 'Wariant alternatywny',
+            popupMakeStart: 'Ustaw jako Start (A)',
+            popupMakeEnd: 'Ustaw jako Meta (B)',
+            ticketPlOnly: 'Koleje Dolnośląskie (Bilet jednorazowy / Bilet Weekendowy KD)',
+            ticketCzOnly: 'České dráhy / IDOL (Regionalny bilet czeski)',
+            ticketDeOnly: 'ZVON / VVO (Taryfa saksońska / Deutschlandticket)',
+            ticketPlCz: 'EURO-NEISSE-Ticket+ lub bilet transgraniczny KD+ČD',
+            ticketPlDe: 'EURO-NEISSE-Ticket+ (KD + Trilex / ZVON)',
+            ticketCzDe: 'EURO-NEISSE-Ticket+ / Elbe-Labe-Ticket (ČD + VVO/Trilex)',
+            archHeroTitle: 'Architektura luźnego powiązania (Loose Coupling) dla kolei i turystyki',
+            archHeroBody: 'Zaprojektowana dla minimalnego obciążenia instytucji Dolnego Śląska (PL), Saksonii (DE) i północnych Czech (CZ). Zamiast budować kosztowny scentralizowany system IT, model wykorzystuje istniejące umowy taryfowe i otwarte standardy danych, dynamicznie łącząc szlaki w przeglądarce przez BRouter.',
+            layer1Title: 'Wykorzystanie istniejących umów (Zero nowej biurokracji)',
+            layer1Body: 'Opiera się na gotowych ofertach transgranicznych (EURO-NEISSE-Ticket+, Elbe-Labe, taryfy KD/ČD/Trilex) oraz utrzymaniu szlaków przez PTTK, KČT i SachsenForst bez tworzenia nowych spółek.',
+            layer2Title: 'Otwarte obiekty graniczne (Boundary Objects)',
+            layer2Body: 'Przewoźnicy publikują standardowe pliki GTFS / NeTEx (dane.gov.pl, CIS JŘ, DELFI/VVO), a organizacje turystyczne aktualizują relacje OSM route=hiking + osmc:symbol. Nikt nie zmienia wewnętrznych procesów.',
+            layer3Title: 'Silnik tras łączonych po stronie klienta',
+            layer3Body: 'BRouter (profil hiking-mountain) dynamicznie łączy szlaki różnych kolorów i państw pomiędzy dowolnymi dwoma peronami — rozwiązując problem „jednego szlaku” bez własnego ciężkiego backendu.',
+            matrixTitle: 'Macierz interfejsów instytucjonalnych (Niski koszt, wysoki efekt)',
+            colActor: 'Instytucja',
+            colExistingDuty: 'Obecne zadania (bez zmian)',
+            colBoundaryObj: 'Wspólny interfejs',
+            colBenefit: 'Korzyść dla instytucji',
+            rowRailDuty: 'Obsługa pociągów i publikacja rozkładów',
+            rowRailBenefit: 'Większa frekwencja weekendowa poza szczytem do stacji górskich',
+            rowClubDuty: 'Znakowanie szlaków i aktualizacja OSM',
+            rowClubBenefit: 'Lepszy dojazd koleją do mniej zatłoczonych pasm górskich',
+            rowMuniDuty: 'Promocja zrównoważonej turystyki regionu',
+            rowMuniBenefit: 'Transgraniczny portal bez kosztów utrzymania centralnych serwerów',
+            backToMapBtn: 'Wróć do interaktywnej mapy',
+          },
+          cs: {
+            appSubtitle: 'Sociotechnický GIS: Regionální železnice (KD / ČD / Trilex) × Kombinované trasy (BRouter)',
+            stationsCountLabel: 'stanic',
+            navMap: 'Mapa a plánovač',
+            navArchitecture: 'Data a sociotechnický model',
+            plannerTitle: 'Plánovač: Ze stanice do stanice',
+            operatorLabel: 'Dopravce',
+            startStationLabel: 'Výchozí stanice (A)',
+            endStationLabel: 'Cílová stanice (B)',
+            selectStartPlaceholder: '— Vyberte výchozí stanici (nebo klikněte do mapy) —',
+            selectEndPlaceholder: '— Vyberte cílovou stanici (nebo klikněte do mapy) —',
+            swapStations: 'Prohodit',
+            profileMountainTitle: 'Značené trasy',
+            profileMountainSub: 'Priorita KČT a PTTK (hiking-mountain)',
+            profileTrekkingTitle: 'Údolí a lesní cesty',
+            profileTrekkingSub: 'Snadnější cesty (trekking)',
+            addViaPointBtn: 'Přidat průjezdní bod (Via)',
+            viaPointActiveBtn: 'Klikněte do mapy pro vložení bodu...',
+            viaPointHint: 'Vložte vrchol nebo vyhlídku mezi stanicí A a B',
+            shiftClickHint: 'Tip: Shift + Klik do mapy',
+            clearViaPointsBtn: 'Smazat body Via',
+            clickMapToAddVia: 'Klikněte kamkoliv do mapy pro vložení průjezdního bodu',
+            calculatingRoutes: 'Počítám kombinované pěší trasy...',
+            longDistTitle: 'Vícedenní vzdálenost ({km} km vzdušnou čarou)',
+            longDistBody: 'Stanice A a B jsou od sebe vzdáleny více než 75 km. Výpočet vícedenní pěší trasy může trvat déle nebo překročit limit serveru BRouter.',
+            routeAnywayBtn: 'Spočítat i tak',
+            routingErrorTitle: 'Nepodařilo se spočítat trasu přes BRouter API',
+            retryBtn: 'Zkusit znovu',
+            selectBothTitle: 'Vyberte výchozí (A) a cílovou (B) stanici',
+            selectBothBody: 'Vyberte stanice ze seznamu nebo klikněte na značky nádraží v mapě pro výpočet kombinované trasy.',
+            loopNeedsViaTitle: 'Zvolena okružní trasa',
+            loopNeedsViaBody: 'Stanice A a B jsou shodné. Přidejte alespoň jeden průjezdní bod (Via) v mapě pro vytvoření okruhu.',
+            alternativesFound: 'Nalezeno kombinovaných variant: {count}',
+            clickToSelectRoute: 'Klikněte na kartu nebo trasu v mapě',
+            primaryRouteLabel: 'Hlavní pěší trasa',
+            alternativeRouteLabel: 'Alternativa #{n}',
+            metricDist: 'Délka',
+            metricAscent: 'Stoupání',
+            metricDescent: 'Klesání',
+            metricMaxEle: 'Max. výška',
+            surfaceMarked: 'Značené trasy',
+            surfaceForest: 'Lesní cesty',
+            surfacePaved: 'Zpevněné / silnice',
+            elevationProfileTitle: 'Výškový profil (přejeďte myší pro polohu v mapě)',
+            downloadGpxBtn: 'Stáhnout GPX',
+            waymarkedOverlayLabel: 'Vrstva Waymarked Trails',
+            waymarkedOverlayHint: 'Skutečné značky KČT, PTTK a Saska, po kterých BRouter naviguje.',
+            legendTitle: 'Legenda mapy',
+            legendStart: 'Výchozí stanice (A)',
+            legendEnd: 'Cílová stanice (B)',
+            legendPrimary: 'Aktivní kombinovaná trasa',
+            legendAlt: 'Alternativní trasa',
+            popupMakeStart: 'Nastavit jako Start (A)',
+            popupMakeEnd: 'Nastavit jako Cíl (B)',
+            ticketPlOnly: 'Koleje Dolnośląskie (Regionální / Víkendová jízdenka KD)',
+            ticketCzOnly: 'České dráhy / IDOL (Regionální jízdenka)',
+            ticketDeOnly: 'ZVON / VVO (Sasko / Deutschlandticket)',
+            ticketPlCz: 'EURO-NEISSE-Ticket+ nebo přeshraniční jízdenka ČD+KD',
+            ticketPlDe: 'EURO-NEISSE-Ticket+ (KD + Trilex / ZVON)',
+            ticketCzDe: 'EURO-NEISSE-Ticket+ / jízdenka Labe-Elbe (ČD + VVO/Trilex)',
+            archHeroTitle: 'Volně vázaný sociotechnický rámec pro přeshraniční železnici a turistiku',
+            archHeroBody: 'Navrženo s minimální administrativní zátěží pro Dolní Slezsko (PL), Sasko (DE) a severní Čechy (CZ). Namísto drahého centralizovaného IT systému propojuje stávající tarifní dohody a otevřená data pomocí dynamického plánování tras v prohlížeči přes BRouter.',
+            layer1Title: 'Využití stávajících dohod (Nulová nová byrokracie)',
+            layer1Body: 'Využívá existující přeshraniční tarify (EURO-NEISSE-Ticket+, Labe-Elbe, KD/ČD/Trilex) a údržbu tras kluby KČT, PTTK a SachsenForst bez nutnosti nových mezistátních smluv.',
+            layer2Title: 'Otevřené hraniční objekty (Boundary Objects)',
+            layer2Body: 'Železniční dopravci publikují standardní data GTFS / NeTEx (CIS JŘ, dane.gov.pl, DELFI/VVO), zatímco turistické kluby udržují OSM route=hiking + osmc:symbol. Nikdo nemění interní procesy.',
+            layer3Title: 'Klientský engine kombinovaného routování',
+            layer3Body: 'BRouter (profil hiking-mountain) dynamicky propojuje různě značené trasy napříč státními hranicemi mezi libovolnými dvěma nádražími bez nutnosti centrálního proprietárního backendu.',
+            matrixTitle: 'Matice rozhraní institucí (Nízké náklady, vysoký přínos)',
+            colActor: 'Instituce',
+            colExistingDuty: 'Stávající činnost (beze změn)',
+            colBoundaryObj: 'Sdílené rozhraní',
+            colBenefit: 'Přínos pro instituci',
+            rowRailDuty: 'Provoz regionálních vlaků a publikace jízdních řádů',
+            rowRailBenefit: 'Vyšší víkendová obsazenost spojů do horských oblastí',
+            rowClubDuty: 'Údržba značení v terénu a v OpenStreetMap',
+            rowClubBenefit: 'Snadná dostupnost méně vytížených tras veřejnou dopravou',
+            rowMuniDuty: 'Podpora udržitelného cestovního ruchu',
+            rowMuniBenefit: 'Přeshraniční portál bez nákladů na centrální servery',
+            backToMapBtn: 'Zpět na interaktivní mapu',
+          },
+          de: {
+            appSubtitle: 'Soziotechnisches GIS: Regionalbahn (KD / ČD / Trilex) × Kombinierte Wanderrouten (BRouter)',
+            stationsCountLabel: 'Bahnhöfe',
+            navMap: 'Karte & Routenplaner',
+            navArchitecture: 'Daten & Soziotechn. Modell',
+            plannerTitle: 'Bahnhof-zu-Bahnhof Planer',
+            operatorLabel: 'Betreiber',
+            startStationLabel: 'Startbahnhof (A)',
+            endStationLabel: 'Zielbahnhof (B)',
+            selectStartPlaceholder: '— Startbahnhof wählen (oder Karte klicken) —',
+            selectEndPlaceholder: '— Zielbahnhof wählen (oder Karte klicken) —',
+            swapStations: 'Tauschen',
+            profileMountainTitle: 'Markierte Wege',
+            profileMountainSub: 'PTTK & KČT Priorität (hiking-mountain)',
+            profileTrekkingTitle: 'Täler & Forstwege',
+            profileTrekkingSub: 'Einfachere Wege (trekking)',
+            addViaPointBtn: 'Zwischenziel (Via) setzen',
+            viaPointActiveBtn: 'Auf Karte klicken für Via-Punkt...',
+            viaPointHint: 'Gipfel oder Aussichtspunkt zwischen Bahnhof A und B einfügen',
+            shiftClickHint: 'Tipp: Shift + Klick auf Karte',
+            clearViaPointsBtn: 'Via-Punkte löschen',
+            clickMapToAddVia: 'Klicken Sie auf die Karte, um ein Zwischenziel einzufügen',
+            calculatingRoutes: 'Berechne kombinierte Wanderrouten...',
+            longDistTitle: 'Mehrtages-Distanz ({km} km Luftlinie)',
+            longDistBody: 'Bahnhof A und B liegen über 75 km auseinander. Die Berechnung einer Mehrtageswanderung kann länger dauern oder BRouter-Limits überschreiten.',
+            routeAnywayBtn: 'Trotzdem berechnen',
+            routingErrorTitle: 'Route konnte nicht über BRouter API berechnet werden',
+            retryBtn: 'Erneut versuchen',
+            selectBothTitle: 'Start- (A) und Zielbahnhof (B) wählen',
+            selectBothBody: 'Wählen Sie Bahnhöfe aus der Liste oder klicken Sie auf die Marker in der Karte für eine kombinierte Wanderung.',
+            loopNeedsViaTitle: 'Rundwanderung gewählt',
+            loopNeedsViaBody: 'Start und Ziel sind identisch. Setzen Sie mindestens einen Via-Punkt auf der Karte für eine Rundtour.',
+            alternativesFound: '{count} kombinierte Routenvariante(n)',
+            clickToSelectRoute: 'Karte oder Track zum Prüfen anklicken',
+            primaryRouteLabel: 'Haupt-Wanderroute',
+            alternativeRouteLabel: 'Alternative #{n}',
+            metricDist: 'Distanz',
+            metricAscent: 'Aufstieg',
+            metricDescent: 'Abstieg',
+            metricMaxEle: 'Max. Höhe',
+            surfaceMarked: 'Markierte Wege',
+            surfaceForest: 'Waldpfade',
+            surfacePaved: 'Asphalt / Straße',
+            elevationProfileTitle: 'Höhenprofil (Mauszeiger zeigt Position auf Karte)',
+            downloadGpxBtn: 'GPX laden',
+            waymarkedOverlayLabel: 'Waymarked Trails Overlay',
+            waymarkedOverlayHint: 'Reale PTTK-, KČT- und sächsische Markierungen, denen BRouter folgt.',
+            legendTitle: 'Kartenlegende',
+            legendStart: 'Startbahnhof (A)',
+            legendEnd: 'Zielbahnhof (B)',
+            legendPrimary: 'Aktive Kombinationsroute',
+            legendAlt: 'Alternativroute',
+            popupMakeStart: 'Als Start (A)',
+            popupMakeEnd: 'Als Ziel (B)',
+            ticketPlOnly: 'Koleje Dolnośląskie (KD Regional / KD-Wochenendticket)',
+            ticketCzOnly: 'České dráhy / IDOL Regionaltarif',
+            ticketDeOnly: 'ZVON / VVO Regionaltarif (Deutschlandticket gültig)',
+            ticketPlCz: 'EURO-NEISSE-Ticket+ oder KD+ČD Grenzticket',
+            ticketPlDe: 'EURO-NEISSE-Ticket+ (KD + Trilex / ZVON)',
+            ticketCzDe: 'EURO-NEISSE-Ticket+ / Elbe-Labe-Ticket (ČD + VVO/Trilex)',
+            archHeroTitle: 'Lose gekoppeltes soziotechnisches Framework für Bahn & Wandern',
+            archHeroBody: 'Entwickelt für minimale institutionelle Reibung in Niederschlesien (PL), Sachsen (DE) und Nordböhmen (CZ). Statt ein teures zentrales IT-Monopol aufzubauen, verknüpft die Architektur bestehende Tarifabkommen mit offenen Datenschnittstellen und kombiniert markierte Wege dynamisch über BRouter.',
+            layer1Title: 'Wiederverwendung bestehender Abkommen (Keine neue Bürokratie)',
+            layer1Body: 'Nutzt bestehende grenzüberschreitende Tarife (EURO-NEISSE-Ticket+, Elbe-Labe-Ticket, KD/ČD/Trilex) sowie die Wegepflege von PTTK, KČT und SachsenForst ohne neue bilaterale Rechtskonstrukte.',
+            layer2Title: 'Offene Grenzobjekte (Boundary Objects)',
+            layer2Body: 'Bahnunternehmen veröffentlichen Standard-GTFS/NeTEx-Feeds (dane.gov.pl, CIS JŘ, DELFI/VVO); Wandervereine pflegen OSM route=hiking + osmc:symbol. Keine Seite ändert interne Abläufe.',
+            layer3Title: 'Clientseitige Kombinations-Routing-Engine',
+            layer3Body: 'BRouter (Profil hiking-mountain) verbindet verschiedenfarbige Wanderwege nahtlos über Staats- und Verbundgrenzen hinweg zwischen zwei beliebigen Bahnsteigen – ohne proprietäres Backend.',
+            matrixTitle: 'Institutionelle Schnittstellen-Matrix (Minimaler Aufwand, maximaler Nutzen)',
+            colActor: 'Institution',
+            colExistingDuty: 'Bestehende Aufgabe (Unverändert)',
+            colBoundaryObj: 'Gemeinsame Schnittstelle',
+            colBenefit: 'Institutioneller Nutzen',
+            rowRailDuty: 'Regionalbahn-Betrieb & Fahrplanveröffentlichung',
+            rowRailBenefit: 'Höhere Wochenend-Auslastung abseits der Pendlerzeiten',
+            rowClubDuty: 'Wegepflege & Aktualisierung in OpenStreetMap',
+            rowClubBenefit: 'Direkte ÖPNV-Anbindung auch für weniger überlaufene Wege',
+            rowMuniDuty: 'Förderung nachhaltigen Regionaltourismus',
+            rowMuniBenefit: 'Grenzüberschreitendes Portal ohne zentrale Serverkosten',
+            backToMapBtn: 'Zurück zur interaktiven Karte',
+          }
+        };
+
+        const t = (key, params = {}) => {
+          const dict = translations[lang.value] || translations.en;
+          let str = dict[key] || translations.en[key] || key;
+          for (const [k, v] of Object.entries(params)) {
+            str = str.replace(`{${k}}`, v);
+          }
+          return str;
+        };
+
+        // App State
+        const activeView = ref('map');
+        const selectedOperator = ref('ALL');
+        const startStationId = ref('pilchowice_zapora');
+        const endStationId = ref('rybnica');
+        const selectedProfile = ref('hiking-mountain');
+        const showWaymarkedOverlay = ref(true); // Enabled by default
+        const addingViaPoint = ref(false);
+        const viaPoints = ref([]);
+
+        // Routing State
+        const routingLoading = ref(false);
+        const routingError = ref('');
+        const longDistanceWarning = ref(false);
+        const routes = ref([]);
+        const selectedRouteIdx = ref(0);
+        const hoverPoint = ref(null);
+
+        const routeColors = ['#e11d48', '#2563eb', '#d97706'];
+
+        const operatorFilters = [
+          { id: 'ALL', label: 'All (PL•CZ•DE)' },
+          { id: 'KD', label: 'Koleje Dolnośląskie (PL)' },
+          { id: 'CD', label: 'České dráhy (CZ)' },
+          { id: 'TRILEX', label: 'Trilex / ZVON / S-Bahn (DE)' }
+        ];
+
+        const presets = [
+          {
+            key: 'bobr',
+            start: 'pilchowice_zapora',
+            end: 'rybnica',
+            label: { en: 'Dolina Bobru', pl: 'Dolina Bobru', cs: 'Údolí Bobru', de: 'Bobertal' }
+          },
+          {
+            key: 'karkonosze',
+            start: 'szklarska_poreba_gorna',
+            end: 'karpacz',
+            label: { en: 'Karkonosze', pl: 'Karkonosze', cs: 'Krkonoše', de: 'Riesengebirge' }
+          },
+          {
+            key: 'izery',
+            start: 'jakuszyce',
+            end: 'korenov',
+            label: { en: 'PL↔CZ Izery', pl: 'PL↔CZ Izery', cs: 'PL↔CZ Jizerky', de: 'PL↔CZ Isergeb.' }
+          },
+          {
+            key: 'elbe',
+            start: 'bad_schandau',
+            end: 'decin_hl_n',
+            label: { en: 'DE↔CZ Elbe', pl: 'DE↔CZ Łaba', cs: 'DE↔CZ Labe', de: 'DE↔CZ Elbe' }
+          },
+          {
+            key: 'stolowe',
+            start: 'kudowa_zdroj',
+            end: 'adrspach',
+            label: { en: 'Stołowe / Adršpach', pl: 'Stołowe / Adršpach', cs: 'Stolové / Adršpach', de: 'Heuscheuer / Adersb.' }
+          }
+        ];
+
+        // Comprehensive Regional Railway Network (136 stations across KD, ČD, Trilex / ZVON / S-Bahn Dresden)
+        const stations = ref([
+          // --- KOLEJE DOLNOŚLĄSKIE (PL) ---
+          { id: 'wroclaw_gl', name: 'Wrocław Główny', country: 'PL', operator: 'KD', lines: ['D1', 'D6', 'D9', 'D10', 'D20'], lat: 51.0989, lng: 17.0365 },
+          { id: 'legnica', name: 'Legnica', country: 'PL', operator: 'KD', lines: ['D1', 'D10', 'D13'], lat: 51.2135, lng: 16.1618 },
+          { id: 'boleslawiec', name: 'Bolesławiec', country: 'PL', operator: 'KD', lines: ['D1', 'D10'], lat: 51.2682, lng: 15.5655 },
+          { id: 'wegliniec', name: 'Węgliniec', country: 'PL', operator: 'KD', lines: ['D1', 'D10', 'D19'], lat: 51.2875, lng: 15.2265 },
+          { id: 'zgorzelec', name: 'Zgorzelec', country: 'PL', operator: 'KD', lines: ['D1', 'D19', 'D62'], lat: 51.1455, lng: 15.0165 },
+          { id: 'luban_slaski', name: 'Lubań Śląski', country: 'PL', operator: 'KD', lines: ['D19', 'D62'], lat: 51.1165, lng: 15.2865 },
+          { id: 'gryfow_slaski', name: 'Gryfów Śląski', country: 'PL', operator: 'KD', lines: ['D62'], lat: 51.0315, lng: 15.4245 },
+          { id: 'mirsk', name: 'Mirsk', country: 'PL', operator: 'KD', lines: ['D62'], lat: 50.9685, lng: 15.3845 },
+          { id: 'swieradow_zdroj', name: 'Świeradów-Zdrój', country: 'PL', operator: 'KD', lines: ['D62'], lat: 50.9078, lng: 15.3412 },
+          { id: 'kwieciszewo', name: 'Kwieciszewo', country: 'PL', operator: 'KD', lines: ['D62'], lat: 50.9415, lng: 15.5125 },
+          { id: 'stara_kamienica', name: 'Stara Kamienica', country: 'PL', operator: 'KD', lines: ['D62'], lat: 50.9165, lng: 15.5745 },
+          { id: 'rybnica', name: 'Rybnica', country: 'PL', operator: 'KD', lines: ['D62'], lat: 50.9125, lng: 15.6545 },
+          { id: 'jelenia_gora', name: 'Jelenia Góra', country: 'PL', operator: 'KD', lines: ['D6', 'D13', 'D61', 'D62'], lat: 50.9041, lng: 15.7538 },
+          { id: 'jelenia_gora_zachodnia', name: 'Jelenia Góra Zachodnia', country: 'PL', operator: 'KD', lines: ['D62'], lat: 50.8925, lng: 15.7165 },
+          { id: 'jelenia_gora_cieplice', name: 'Jelenia Góra Cieplice', country: 'PL', operator: 'KD', lines: ['D62'], lat: 50.8648, lng: 15.6815 },
+          { id: 'jelenia_gora_sobieszow', name: 'Jelenia Góra Sobieszów', country: 'PL', operator: 'KD', lines: ['D62'], lat: 50.8512, lng: 15.6362 },
+          { id: 'piechowice', name: 'Piechowice', country: 'PL', operator: 'KD', lines: ['D62'], lat: 50.8475, lng: 15.6028 },
+          { id: 'szklarska_poreba_dolna', name: 'Szklarska Poręba Dolna', country: 'PL', operator: 'KD', lines: ['D62'], lat: 50.8362, lng: 15.5540 },
+          { id: 'szklarska_poreba_srednia', name: 'Szklarska Poręba Średnia', country: 'PL', operator: 'KD', lines: ['D62'], lat: 50.8305, lng: 15.5345 },
+          { id: 'szklarska_poreba_gorna', name: 'Szklarska Poręba Górna', country: 'PL', operator: 'KD', lines: ['D62', 'L1'], lat: 50.8318, lng: 15.5148 },
+          { id: 'szklarska_poreba_huta', name: 'Szklarska Poręba Huta', country: 'PL', operator: 'KD', lines: ['D62', 'L1'], lat: 50.8225, lng: 15.4925 },
+          { id: 'jakuszyce', name: 'Szklarska Poręba Jakuszyce', country: 'PL', operator: 'KD', lines: ['D62', 'L1'], lat: 50.8165, lng: 15.4290 },
+          { id: 'myslakowice', name: 'Mysłakowice', country: 'PL', operator: 'KD', lines: ['D61'], lat: 50.8469, lng: 15.7745 },
+          { id: 'karpacz', name: 'Karpacz', country: 'PL', operator: 'KD', lines: ['D61'], lat: 50.7779, lng: 15.7575 },
+          { id: 'kowary', name: 'Kowary', country: 'PL', operator: 'KD', lines: ['D61'], lat: 50.7935, lng: 15.8345 },
+          { id: 'wojanow', name: 'Wojanów', country: 'PL', operator: 'KD', lines: ['D6'], lat: 50.8765, lng: 15.8145 },
+          { id: 'trzcinsko', name: 'Trzcińsko', country: 'PL', operator: 'KD', lines: ['D6'], lat: 50.8698, lng: 15.8692 },
+          { id: 'janowice_wielkie', name: 'Janowice Wielkie', country: 'PL', operator: 'KD', lines: ['D6'], lat: 50.8756, lng: 15.9219 },
+          { id: 'marciszow', name: 'Marciszów', country: 'PL', operator: 'KD', lines: ['D6'], lat: 50.8445, lng: 16.0265 },
+          { id: 'sedzislaw', name: 'Sędzisław', country: 'PL', operator: 'KD', lines: ['D6', 'D67'], lat: 50.8225, lng: 16.0585 },
+          { id: 'kamienna_gora', name: 'Kamienna Góra', country: 'PL', operator: 'KD', lines: ['D67'], lat: 50.7845, lng: 16.0325 },
+          { id: 'lubawka', name: 'Lubawka', country: 'PL', operator: 'KD', lines: ['D67'], lat: 50.7065, lng: 15.9985 },
+          { id: 'boguszow_gorce_zachod', name: 'Boguszów-Gorce Zachód', country: 'PL', operator: 'KD', lines: ['D6'], lat: 50.7615, lng: 16.1855 },
+          { id: 'boguszow_gorce', name: 'Boguszów-Gorce', country: 'PL', operator: 'KD', lines: ['D6', 'D66'], lat: 50.7515, lng: 16.2125 },
+          { id: 'walbrzych_gl', name: 'Wałbrzych Główny', country: 'PL', operator: 'KD', lines: ['D6', 'D15', 'D66'], lat: 50.7425, lng: 16.2655 },
+          { id: 'walbrzych_miasto', name: 'Wałbrzych Miasto', country: 'PL', operator: 'KD', lines: ['D6', 'D15', 'D66'], lat: 50.7858, lng: 16.2862 },
+          { id: 'walbrzych_szczawienko', name: 'Wałbrzych Szczawienko', country: 'PL', operator: 'KD', lines: ['D6'], lat: 50.8168, lng: 16.3042 },
+          { id: 'swiebodzice', name: 'Świebodzice', country: 'PL', operator: 'KD', lines: ['D6'], lat: 50.8612, lng: 16.3258 },
+          { id: 'jaworzyna_slaska', name: 'Jaworzyna Śląska', country: 'PL', operator: 'KD', lines: ['D6', 'D16'], lat: 50.9165, lng: 16.4325 },
+          { id: 'swidnica_miasto', name: 'Świdnica Miasto', country: 'PL', operator: 'KD', lines: ['D16', 'D20'], lat: 50.8415, lng: 16.4945 },
+          { id: 'swidnica_kraszowice', name: 'Świdnica Kraszowice', country: 'PL', operator: 'KD', lines: ['D15', 'D16'], lat: 50.8165, lng: 16.4845 },
+          { id: 'sobotka', name: 'Sobótka', country: 'PL', operator: 'KD', lines: ['D20'], lat: 50.8982, lng: 16.7438 },
+          { id: 'sobotka_zachodnia', name: 'Sobótka Zachodnia', country: 'PL', operator: 'KD', lines: ['D20'], lat: 50.8962, lng: 16.7212 },
+          { id: 'dzierzoniow', name: 'Dzierżoniów Śląski', country: 'PL', operator: 'KD', lines: ['D16'], lat: 50.7308, lng: 16.6428 },
+          { id: 'bielawa_zachodnia', name: 'Bielawa Zachodnia', country: 'PL', operator: 'KD', lines: ['D16'], lat: 50.6862, lng: 16.6078 },
+          { id: 'pieszyce', name: 'Pieszyce', country: 'PL', operator: 'KD', lines: ['D16'], lat: 50.7155, lng: 16.5885 },
+          { id: 'jedlina_zdroj', name: 'Jedlina-Zdrój', country: 'PL', operator: 'KD', lines: ['D15'], lat: 50.7185, lng: 16.3425 },
+          { id: 'gluszyca', name: 'Głuszyca', country: 'PL', operator: 'KD', lines: ['D15'], lat: 50.6888, lng: 16.3682 },
+          { id: 'bartnica', name: 'Bartnica', country: 'PL', operator: 'KD', lines: ['D15'], lat: 50.6315, lng: 16.4325 },
+          { id: 'nowa_ruda', name: 'Nowa Ruda', country: 'PL', operator: 'KD', lines: ['D15'], lat: 50.5765, lng: 16.4965 },
+          { id: 'scinawka_srednia', name: 'Ścinawka Średnia', country: 'PL', operator: 'KD', lines: ['D15'], lat: 50.5185, lng: 16.4985 },
+          { id: 'klodzko_miasto', name: 'Kłodzko Miasto', country: 'PL', operator: 'KD', lines: ['D9', 'D29'], lat: 50.4368, lng: 16.6582 },
+          { id: 'klodzko_gl', name: 'Kłodzko Główne', country: 'PL', operator: 'KD', lines: ['D9', 'D15', 'D29'], lat: 50.4438, lng: 16.6542 },
+          { id: 'polanica_zdroj', name: 'Polanica-Zdrój', country: 'PL', operator: 'KD', lines: ['D29'], lat: 50.4028, lng: 16.5162 },
+          { id: 'szczytna', name: 'Szczytna', country: 'PL', operator: 'KD', lines: ['D29'], lat: 50.4128, lng: 16.4482 },
+          { id: 'duszniki_zdroj', name: 'Duszniki-Zdrój', country: 'PL', operator: 'KD', lines: ['D29'], lat: 50.3962, lng: 16.3878 },
+          { id: 'lewin_klodzki', name: 'Lewin Kłodzki', country: 'PL', operator: 'KD', lines: ['D29'], lat: 50.4085, lng: 16.2865 },
+          { id: 'kudowa_zdroj', name: 'Kudowa-Zdrój', country: 'PL', operator: 'KD', lines: ['D29'], lat: 50.4368, lng: 16.2432 },
+          { id: 'bardo_slaskie', name: 'Bardo Śląskie', country: 'PL', operator: 'KD', lines: ['D9'], lat: 50.5062, lng: 16.7382 },
+          { id: 'bystrzyca_klodzka', name: 'Bystrzyca Kłodzka', country: 'PL', operator: 'KD', lines: ['D9'], lat: 50.2962, lng: 16.6522 },
+          { id: 'dlugopole_zdroj', name: 'Długopole-Zdrój', country: 'PL', operator: 'KD', lines: ['D9'], lat: 50.2462, lng: 16.6342 },
+          { id: 'miedzylesie', name: 'Międzylesie', country: 'PL', operator: 'KD', lines: ['D9'], lat: 50.1482, lng: 16.6562 },
+          { id: 'mieroszow', name: 'Mieroszów', country: 'PL', operator: 'KD', lines: ['D66'], lat: 50.6658, lng: 16.1875 },
+          { id: 'unislaw_slaski', name: 'Unisław Śląski', country: 'PL', operator: 'KD', lines: ['D66'], lat: 50.7065, lng: 16.2165 },
+          { id: 'siedlecin', name: 'Siedlęcin', country: 'PL', operator: 'KD', lines: ['D13'], lat: 50.9352, lng: 15.6852 },
+          { id: 'pilchowice_zapora', name: 'Pilchowice Zapora', country: 'PL', operator: 'KD', lines: ['D13'], lat: 50.9718, lng: 15.6438 },
+          { id: 'pilchowice_nielestno', name: 'Pilchowice Nielestno', country: 'PL', operator: 'KD', lines: ['D13'], lat: 50.9922, lng: 15.6555 },
+          { id: 'wlen', name: 'Wleń', country: 'PL', operator: 'KD', lines: ['D13'], lat: 51.0162, lng: 15.6682 },
+          { id: 'lwowek_slaski', name: 'Lwówek Śląski', country: 'PL', operator: 'KD', lines: ['D13'], lat: 51.1125, lng: 15.5865 },
+          { id: 'jawor', name: 'Jawor', country: 'PL', operator: 'KD', lines: ['D16'], lat: 51.0525, lng: 16.1965 },
+          { id: 'strzegom', name: 'Strzegom', country: 'PL', operator: 'KD', lines: ['D16'], lat: 50.9615, lng: 16.3485 },
+          { id: 'zlotoryja', name: 'Złotoryja', country: 'PL', operator: 'KD', lines: ['D13'], lat: 51.1285, lng: 15.9185 },
+          { id: 'jerzmanice_zdroj', name: 'Jerzmanice-Zdrój', country: 'PL', operator: 'KD', lines: ['D13'], lat: 51.1165, lng: 15.8665 },
+          { id: 'trzebnica', name: 'Trzebnica', country: 'PL', operator: 'KD', lines: ['D8'], lat: 51.3095, lng: 17.0645 },
+          { id: 'milicz', name: 'Milicz', country: 'PL', operator: 'KD', lines: ['D7'], lat: 51.5245, lng: 17.2745 },
+          { id: 'olesnica', name: 'Oleśnica', country: 'PL', operator: 'KD', lines: ['D7'], lat: 51.2045, lng: 17.3815 },
+          { id: 'olawa', name: 'Oława', country: 'PL', operator: 'KD', lines: ['D4'], lat: 50.9465, lng: 17.2965 },
+          { id: 'brzeg', name: 'Brzeg', country: 'PL', operator: 'KD', lines: ['D4'], lat: 50.8585, lng: 17.4665 },
+
+          // --- ČESKÉ DRÁHY (CZ) ---
+          { id: 'harrachov', name: 'Harrachov', country: 'CZ', operator: 'CD', lines: ['L1'], lat: 50.7795, lng: 15.4052 },
+          { id: 'korenov', name: 'Kořenov', country: 'CZ', operator: 'CD', lines: ['L1'], lat: 50.7618, lng: 15.3675 },
+          { id: 'desna', name: 'Desná', country: 'CZ', operator: 'CD', lines: ['L1'], lat: 50.7565, lng: 15.3185 },
+          { id: 'tanvald', name: 'Tanvald', country: 'CZ', operator: 'CD', lines: ['L1'], lat: 50.7368, lng: 15.3055 },
+          { id: 'smrzovka', name: 'Smržovka', country: 'CZ', operator: 'CD', lines: ['L1'], lat: 50.7385, lng: 15.2465 },
+          { id: 'jablonec_nad_nisou', name: 'Jablonec nad Nisou', country: 'CZ', operator: 'CD', lines: ['L1'], lat: 50.7195, lng: 15.1665 },
+          { id: 'liberec', name: 'Liberec', country: 'CZ', operator: 'CD', lines: ['L1', 'L6', 'L7'], lat: 50.7635, lng: 15.0445 },
+          { id: 'chrastava', name: 'Chrastava', country: 'CZ', operator: 'CD', lines: ['L7'], lat: 50.8165, lng: 14.9685 },
+          { id: 'hradek_nad_nisou', name: 'Hrádek nad Nisou', country: 'CZ', operator: 'CD', lines: ['L7'], lat: 50.8545, lng: 14.8445 },
+          { id: 'frydlant', name: 'Frýdlant v Čechách', country: 'CZ', operator: 'CD', lines: ['L6'], lat: 50.9195, lng: 15.0765 },
+          { id: 'raspenava', name: 'Raspenava', country: 'CZ', operator: 'CD', lines: ['L6'], lat: 50.9022, lng: 15.1462 },
+          { id: 'hejnice', name: 'Hejnice', country: 'CZ', operator: 'CD', lines: ['L6'], lat: 50.8762, lng: 15.1822 },
+          { id: 'bily_potok', name: 'Bílý Potok pod Smrkem', country: 'CZ', operator: 'CD', lines: ['L6'], lat: 50.8742, lng: 15.2182 },
+          { id: 'nove_mesto_pod_smrkem', name: 'Nové Město pod Smrkem', country: 'CZ', operator: 'CD', lines: ['L6'], lat: 50.9262, lng: 15.2362 },
+          { id: 'mezimesti', name: 'Meziměstí', country: 'CZ', operator: 'CD', lines: ['026', 'D66'], lat: 50.6235, lng: 16.2415 },
+          { id: 'teplice_nad_metuji', name: 'Teplice nad Metují', country: 'CZ', operator: 'CD', lines: ['026', '047'], lat: 50.5938, lng: 16.1682 },
+          { id: 'teplice_nad_metuji_skaly', name: 'Teplice nad Metují skály', country: 'CZ', operator: 'CD', lines: ['047'], lat: 50.5988, lng: 16.1462 },
+          { id: 'adrspach', name: 'Adršpach', country: 'CZ', operator: 'CD', lines: ['047'], lat: 50.6148, lng: 16.1218 },
+          { id: 'police_nad_metuji', name: 'Police nad Metují', country: 'CZ', operator: 'CD', lines: ['026'], lat: 50.5315, lng: 16.2165 },
+          { id: 'nachod', name: 'Náchod', country: 'CZ', operator: 'CD', lines: ['026'], lat: 50.4165, lng: 16.1615 },
+          { id: 'kralovec', name: 'Královec', country: 'CZ', operator: 'CD', lines: ['043', 'D67'], lat: 50.6745, lng: 15.9785 },
+          { id: 'trutnov', name: 'Trutnov hl.n.', country: 'CZ', operator: 'CD', lines: ['043', '045'], lat: 50.5625, lng: 15.9215 },
+          { id: 'svoboda_nad_upou', name: 'Svoboda nad Úpou', country: 'CZ', operator: 'CD', lines: ['045'], lat: 50.6245, lng: 15.8165 },
+          { id: 'lichkov', name: 'Lichkov', country: 'CZ', operator: 'CD', lines: ['024', 'D9'], lat: 50.0968, lng: 16.6662 },
+          { id: 'kraliky', name: 'Králíky', country: 'CZ', operator: 'CD', lines: ['024'], lat: 50.0825, lng: 16.7595 },
+          { id: 'decin_hl_n', name: 'Děčín hl.n.', country: 'CZ', operator: 'CD', lines: ['U28', '090'], lat: 50.7735, lng: 14.2015 },
+          { id: 'dolni_zleb', name: 'Dolní Žleb', country: 'CZ', operator: 'CD', lines: ['U28'], lat: 50.8425, lng: 14.2185 },
+          { id: 'hrensko', name: 'Hřensko (Ferry / Rail)', country: 'CZ', operator: 'CD', lines: ['U28', 'F1'], lat: 50.8745, lng: 14.2365 },
+          { id: 'benesov_nad_ploucnici', name: 'Benešov nad Ploučnicí', country: 'CZ', operator: 'CD', lines: ['081'], lat: 50.7425, lng: 14.3125 },
+          { id: 'ceska_kamenice', name: 'Česká Kamenice', country: 'CZ', operator: 'CD', lines: ['081'], lat: 50.7995, lng: 14.4165 },
+          { id: 'jedlova', name: 'Jedlová', country: 'CZ', operator: 'CD', lines: ['081', 'L4'], lat: 50.8615, lng: 14.5585 },
+          { id: 'rumburk', name: 'Rumburk', country: 'CZ', operator: 'CD', lines: ['U28', '081'], lat: 50.9515, lng: 14.5495 },
+          { id: 'varnsdorf', name: 'Varnsdorf', country: 'CZ', operator: 'CD', lines: ['L7'], lat: 50.9165, lng: 14.6215 },
+
+          // --- TRILEX / ZVON / S-BAHN DRESDEN (DE) ---
+          { id: 'gorlitz', name: 'Görlitz', country: 'DE', operator: 'TRILEX', lines: ['RB60', 'RB65', 'D1'], lat: 51.1486, lng: 14.9802 },
+          { id: 'hagenwerder', name: 'Hagenwerder', country: 'DE', operator: 'TRILEX', lines: ['RB65'], lat: 51.0625, lng: 14.9625 },
+          { id: 'hirschfelde', name: 'Hirschfelde', country: 'DE', operator: 'TRILEX', lines: ['RB65'], lat: 50.9465, lng: 14.8885 },
+          { id: 'zittau', name: 'Zittau', country: 'DE', operator: 'TRILEX', lines: ['RB65', 'L7', 'SOEG'], lat: 50.9059, lng: 14.8058 },
+          { id: 'zittau_sud', name: 'Zittau Süd', country: 'DE', operator: 'TRILEX', lines: ['SOEG'], lat: 50.8895, lng: 14.8085 },
+          { id: 'olbersdorf', name: 'Olbersdorf', country: 'DE', operator: 'TRILEX', lines: ['SOEG'], lat: 50.8755, lng: 14.7785 },
+          { id: 'bertsdorf', name: 'Bertsdorf', country: 'DE', operator: 'TRILEX', lines: ['SOEG'], lat: 50.8922, lng: 14.7922 },
+          { id: 'oybin', name: 'Kurort Oybin', country: 'DE', operator: 'TRILEX', lines: ['SOEG'], lat: 50.8422, lng: 14.7422 },
+          { id: 'jonsdorf', name: 'Kurort Jonsdorf', country: 'DE', operator: 'TRILEX', lines: ['SOEG'], lat: 50.8512, lng: 14.7062 },
+          { id: 'mittelherwigsdorf', name: 'Mittelherwigsdorf', country: 'DE', operator: 'TRILEX', lines: ['RB61', 'L7'], lat: 50.9165, lng: 14.7565 },
+          { id: 'grossschonau', name: 'Großschönau (Sachs)', country: 'DE', operator: 'TRILEX', lines: ['L7'], lat: 50.8965, lng: 14.6615 },
+          { id: 'seifhennersdorf', name: 'Seifhennersdorf', country: 'DE', operator: 'TRILEX', lines: ['L7'], lat: 50.9325, lng: 14.6115 },
+          { id: 'ebersbach', name: 'Ebersbach (Sachs)', country: 'DE', operator: 'TRILEX', lines: ['RB61'], lat: 51.0065, lng: 14.5915 },
+          { id: 'lobau', name: 'Löbau (Sachs)', country: 'DE', operator: 'TRILEX', lines: ['RB60', 'RE1'], lat: 51.0965, lng: 14.6665 },
+          { id: 'bautzen', name: 'Bautzen', country: 'DE', operator: 'TRILEX', lines: ['RB60', 'RE1'], lat: 51.1745, lng: 14.4325 },
+          { id: 'sebnitz', name: 'Sebnitz (Sachs)', country: 'DE', operator: 'TRILEX', lines: ['U28', 'RB71'], lat: 50.9715, lng: 14.2745 },
+          { id: 'bad_schandau', name: 'Bad Schandau', country: 'DE', operator: 'TRILEX', lines: ['S1', 'U28'], lat: 50.9182, lng: 14.1425 },
+          { id: 'krippen', name: 'Krippen', country: 'DE', operator: 'TRILEX', lines: ['S1'], lat: 50.9085, lng: 14.1645 },
+          { id: 'schmilka', name: 'Schmilka-Hirschmühle', country: 'DE', operator: 'TRILEX', lines: ['S1'], lat: 50.8915, lng: 14.2215 },
+          { id: 'schona', name: 'Schöna (Border)', country: 'DE', operator: 'TRILEX', lines: ['S1', 'U28'], lat: 50.8758, lng: 14.2342 },
+          { id: 'konigstein', name: 'Königstein (Sächs Schw)', country: 'DE', operator: 'TRILEX', lines: ['S1'], lat: 50.9188, lng: 14.0728 },
+          { id: 'kurort_rathen', name: 'Kurort Rathen', country: 'DE', operator: 'TRILEX', lines: ['S1'], lat: 50.9562, lng: 14.0782 },
+          { id: 'stadt_wehlen', name: 'Stadt Wehlen', country: 'DE', operator: 'TRILEX', lines: ['S1'], lat: 50.9565, lng: 14.0315 },
+          { id: 'pirna', name: 'Pirna', country: 'DE', operator: 'TRILEX', lines: ['S1', 'S2', 'RB71'], lat: 50.9625, lng: 13.9325 }
+        ]);
+
+        // Simplified Regional Rail Corridors
+        const railLines = [
+          { name: 'KD D1 / D10 (Wrocław – Legnica – Bolesławiec – Zgorzelec – Görlitz)', operator: 'KD', stationIds: ['wroclaw_gl', 'legnica', 'boleslawiec', 'wegliniec', 'zgorzelec', 'gorlitz'] },
+          { name: 'KD D62 (Zgorzelec – Lubań – Gryfów – Jelenia Góra – Szklarska Poręba – Jakuszyce)', operator: 'KD', stationIds: ['zgorzelec', 'luban_slaski', 'gryfow_slaski', 'kwieciszewo', 'stara_kamienica', 'rybnica', 'jelenia_gora', 'jelenia_gora_zachodnia', 'jelenia_gora_cieplice', 'jelenia_gora_sobieszow', 'piechowice', 'szklarska_poreba_dolna', 'szklarska_poreba_srednia', 'szklarska_poreba_gorna', 'szklarska_poreba_huta', 'jakuszyce'] },
+          { name: 'KD D62 Branch (Gryfów Śląski – Mirsk – Świeradów-Zdrój)', operator: 'KD', stationIds: ['gryfow_slaski', 'mirsk', 'swieradow_zdroj'] },
+          { name: 'KD D61 (Jelenia Góra – Mysłakowice – Karpacz / Kowary)', operator: 'KD', stationIds: ['jelenia_gora', 'myslakowice', 'karpacz'] },
+          { name: 'KD D13 (Jelenia Góra – Siedlęcin – Pilchowice – Wleń – Lwówek – Złotoryja – Legnica)', operator: 'KD', stationIds: ['jelenia_gora', 'siedlecin', 'pilchowice_zapora', 'pilchowice_nielestno', 'wlen', 'lwowek_slaski', 'jerzmanice_zdroj', 'zlotoryja', 'legnica'] },
+          { name: 'KD D6 (Wrocław – Jaworzyna – Świebodzice – Wałbrzych – Janowice – Jelenia Góra)', operator: 'KD', stationIds: ['wroclaw_gl', 'jaworzyna_slaska', 'swiebodzice', 'walbrzych_szczawienko', 'walbrzych_miasto', 'walbrzych_gl', 'boguszow_gorce', 'boguszow_gorce_zachod', 'sedzislaw', 'marciszow', 'janowice_wielkie', 'trzcinsko', 'wojanow', 'jelenia_gora'] },
+          { name: 'KD D66 / ČD 047 (Wałbrzych – Unisław – Mieroszów – Meziměstí – Teplice – Adršpach)', operator: 'KD', stationIds: ['boguszow_gorce', 'unislaw_slaski', 'mieroszow', 'mezimesti', 'teplice_nad_metuji', 'teplice_nad_metuji_skaly', 'adrspach'] },
+          { name: 'KD D67 / ČD 043 (Sędzisław – Kamienna Góra – Lubawka – Královec – Trutnov)', operator: 'KD', stationIds: ['sedzislaw', 'kamienna_gora', 'lubawka', 'kralovec', 'trutnov', 'svoboda_nad_upou'] },
+          { name: 'KD D15 (Wałbrzych – Jedlina-Zdrój – Głuszyca – Nowa Ruda – Kłodzko)', operator: 'KD', stationIds: ['walbrzych_gl', 'jedlina_zdroj', 'gluszyca', 'bartnica', 'nowa_ruda', 'scinawka_srednia', 'klodzko_gl'] },
+          { name: 'KD D16 / D20 (Wrocław – Sobótka – Świdnica – Dzierżoniów – Bielawa)', operator: 'KD', stationIds: ['wroclaw_gl', 'sobotka', 'sobotka_zachodnia', 'swidnica_miasto', 'swidnica_kraszowice', 'dzierzoniow', 'bielawa_zachodnia'] },
+          { name: 'KD D9 / D29 (Bardo – Kłodzko – Polanica – Duszniki – Kudowa & Międzylesie – Lichkov)', operator: 'KD', stationIds: ['bardo_slaskie', 'klodzko_gl', 'klodzko_miasto', 'polanica_zdroj', 'szczytna', 'duszniki_zdroj', 'lewin_klodzki', 'kudowa_zdroj'] },
+          { name: 'KD D9 South (Kłodzko – Bystrzyca – Długopole – Międzylesie – Lichkov)', operator: 'KD', stationIds: ['klodzko_miasto', 'bystrzyca_klodzka', 'dlugopole_zdroj', 'miedzylesie', 'lichkov', 'kraliky'] },
+          { name: 'ČD L1 (Jakuszyce – Harrachov – Kořenov – Tanvald – Jablonec – Liberec)', operator: 'CD', stationIds: ['jakuszyce', 'harrachov', 'korenov', 'desna', 'tanvald', 'smrzovka', 'jablonec_nad_nisou', 'liberec'] },
+          { name: 'ČD L6 (Liberec – Frýdlant – Raspenava – Hejnice – Bílý Potok)', operator: 'CD', stationIds: ['liberec', 'frydlant', 'raspenava', 'hejnice', 'bily_potok'] },
+          { name: 'Trilex RB65 / L7 (Görlitz – Zittau – Hrádek – Chrastava – Liberec)', operator: 'TRILEX', stationIds: ['gorlitz', 'hagenwerder', 'hirschfelde', 'zittau', 'hradek_nad_nisou', 'chrastava', 'liberec'] },
+          { name: 'SOEG (Zittau – Bertsdorf – Oybin / Jonsdorf)', operator: 'TRILEX', stationIds: ['zittau', 'zittau_sud', 'olbersdorf', 'bertsdorf', 'oybin'] },
+          { name: 'S1 / U28 (Pirna – Rathen – Königstein – Bad Schandau – Schöna – Děčín)', operator: 'TRILEX', stationIds: ['pirna', 'stadt_wehlen', 'kurort_rathen', 'konigstein', 'bad_schandau', 'krippen', 'schmilka', 'schona', 'dolni_zleb', 'decin_hl_n'] },
+          { name: 'U28 Nationalparkbahn (Bad Schandau – Sebnitz – Rumburk – Jedlová – Děčín)', operator: 'TRILEX', stationIds: ['bad_schandau', 'sebnitz', 'rumburk', 'jedlova', 'ceska_kamenice', 'benesov_nad_ploucnici', 'decin_hl_n'] }
+        ];
+
+        // Computed station lookups
+        const filteredStations = computed(() => {
+          const list = selectedOperator.value === 'ALL'
+            ? stations.value
+            : stations.value.filter(s => s.operator === selectedOperator.value);
+          return [...list].sort((a, b) => a.name.localeCompare(b.name));
+        });
+
+        const startStation = computed(() => stations.value.find(s => s.id === startStationId.value) || null);
+        const endStation = computed(() => stations.value.find(s => s.id === endStationId.value) || null);
+
+        // Haversine distance (km)
+        const haversineKm = (lat1, lon1, lat2, lon2) => {
+          const R = 6371;
+          const dLat = (lat2 - lat1) * Math.PI / 180;
+          const dLon = (lon2 - lon1) * Math.PI / 180;
+          const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) ** 2;
+          return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        };
+
+        const straightLineKm = computed(() => {
+          if (!startStation.value || !endStation.value) return 0;
+          return haversineKm(startStation.value.lat, startStation.value.lng, endStation.value.lat, endStation.value.lng);
+        });
+
+        // Cross-Border Ticket Hint
+        const ticketHint = computed(() => {
+          if (!startStation.value || !endStation.value) return null;
+          const pair = [startStation.value.country, endStation.value.country].sort().join('-');
+          if (pair === 'PL-PL') return { badge: 'PL • KD', text: t('ticketPlOnly') };
+          if (pair === 'CZ-CZ') return { badge: 'CZ • ČD', text: t('ticketCzOnly') };
+          if (pair === 'DE-DE') return { badge: 'DE • ZVON/VVO', text: t('ticketDeOnly') };
+          if (pair === 'CZ-PL') return { badge: 'PL ↔ CZ', text: t('ticketPlCz') };
+          if (pair === 'DE-PL') return { badge: 'PL ↔ DE', text: t('ticketPlDe') };
+          if (pair === 'CZ-DE') return { badge: 'DE ↔ CZ', text: t('ticketCzDe') };
+          return { badge: 'PL•CZ•DE', text: t('ticketPlCz') };
+        });
+
+        // Build lonlats string for BRouter
+        const buildLonLats = () => {
+          if (!startStation.value || !endStation.value) return '';
+          const pts = [
+            `${startStation.value.lng.toFixed(6)},${startStation.value.lat.toFixed(6)}`,
+            ...viaPoints.value.map(v => `${v.lng.toFixed(6)},${v.lat.toFixed(6)}`),
+            `${endStation.value.lng.toFixed(6)},${endStation.value.lat.toFixed(6)}`
+          ];
+          return pts.join('|');
+        };
+
+        const fallbackExternalLinks = computed(() => {
+          if (!startStation.value || !endStation.value) return null;
+          const midLat = ((startStation.value.lat + endStation.value.lat) / 2).toFixed(5);
+          const midLon = ((startStation.value.lng + endStation.value.lng) / 2).toFixed(5);
+          const lonlats = buildLonLats();
+          return {
+            brouter: `https://brouter.de/brouter-web/#map=12/${midLat}/${midLon}/OpenTopoMap&lonlats=${lonlats}&profile=${selectedProfile.value}`,
+            mapy: `https://mapy.com/en/turisticka?planovani-trasy&x=${midLon}&y=${midLat}&z=12`,
+            waymarked: `https://hiking.waymarkedtrails.org/#?map=12.0/${midLat}/${midLon}`
+          };
+        });
+
+        // Parse BRouter GeoJSON feature into rich telemetry + SVG elevation profile
+        const parseBRouterFeature = (geojson, altIdx, lonlats) => {
+          const feat = geojson?.features?.[0];
+          if (!feat || !feat.geometry || !feat.geometry.coordinates || feat.geometry.coordinates.length < 2) {
+            return null;
+          }
+
+          const rawCoords = feat.geometry.coordinates; // [lon, lat, ele?]
+          const props = feat.properties || {};
+
+          // Build cumulative distance array & elevation stats
+          let totalDistKm = 0;
+          let calcAscent = 0;
+          let calcDescent = 0;
+          let minEle = Infinity;
+          let maxEle = -Infinity;
+          const profilePoints = [];
+
+          for (let i = 0; i < rawCoords.length; i++) {
+            const [lon, lat, rawEle] = rawCoords[i];
+            const ele = typeof rawEle === 'number' && !Number.isNaN(rawEle) ? rawEle : 0;
+
+            if (i > 0) {
+              const [prevLon, prevLat, prevRawEle] = rawCoords[i - 1];
+              const segDist = haversineKm(prevLat, prevLon, lat, lon);
+              totalDistKm += segDist;
+
+              const prevEle = typeof prevRawEle === 'number' && !Number.isNaN(prevRawEle) ? prevRawEle : ele;
+              const diff = ele - prevEle;
+              if (diff > 0) calcAscent += diff;
+              else calcDescent += Math.abs(diff);
+            }
+
+            if (ele < minEle) minEle = ele;
+            if (ele > maxEle) maxEle = ele;
+
+            profilePoints.push({ lat, lng: lon, ele, distKm: totalDistKm });
+          }
+
+          const propLenM = Number(props['track-length']);
+          const distanceKm = !Number.isNaN(propLenM) && propLenM > 0 ? propLenM / 1000 : totalDistKm;
+
+          const propAsc = Number(props['filtered ascend']);
+          const ascentM = !Number.isNaN(propAsc) && propAsc >= 0 ? Math.round(propAsc) : Math.round(calcAscent);
+
+          // Derive descent consistently from filtered ascent + net elevation difference if available
+          const netEleChange = profilePoints[profilePoints.length - 1].ele - profilePoints[0].ele;
+          const descentM = !Number.isNaN(propAsc) && propAsc >= 0
+            ? Math.max(0, Math.round(ascentM - netEleChange))
+            : Math.round(calcDescent);
+
+          // Realistic hiking time (Naismith / DIN 33466: distance / 4.2 km/h + ascent / 400 m/h)
+          const totalHours = distanceKm / 4.2 + ascentM / 400;
+          const hrs = Math.floor(totalHours);
+          const mins = Math.round((totalHours - hrs) * 60);
+          const durationText = hrs > 0 ? `${hrs}h ${String(mins).padStart(2, '0')}m` : `${mins}m`;
+
+          // Parse BRouter messages table for surface / marked trail breakdown
+          let markedDist = 0;
+          let forestDist = 0;
+          let pavedDist = 0;
+          const messages = props.messages;
+
+          if (Array.isArray(messages) && messages.length > 1) {
+            const header = messages[0].map(h => String(h).toLowerCase());
+            const distIdx = header.indexOf('distance');
+            const tagsIdx = header.indexOf('waytags');
+
+            if (distIdx !== -1 && tagsIdx !== -1) {
+              for (let r = 1; r < messages.length; r++) {
+                const row = messages[r];
+                const d = Number(row[distIdx]) || 0;
+                const wt = String(row[tagsIdx] || '').toLowerCase();
+
+                if (
+                  wt.includes('route_hiking') ||
+                  wt.includes('lwn') ||
+                  wt.includes('rwn') ||
+                  wt.includes('nwn') ||
+                  wt.includes('iwn') ||
+                  wt.includes('hiking')
+                ) {
+                  markedDist += d;
+                } else if (
+                  wt.includes('highway=path') ||
+                  wt.includes('highway=footway') ||
+                  wt.includes('highway=track') ||
+                  wt.includes('highway=bridleway') ||
+                  wt.includes('highway=steps')
+                ) {
+                  forestDist += d;
+                } else if (
+                  wt.includes('highway=residential') ||
+                  wt.includes('highway=tertiary') ||
+                  wt.includes('highway=secondary') ||
+                  wt.includes('highway=unclassified') ||
+                  wt.includes('highway=service') ||
+                  wt.includes('highway=road') ||
+                  wt.includes('highway=primary') ||
+                  wt.includes('highway=living_street')
+                ) {
+                  pavedDist += d;
+                } else {
+                  forestDist += d;
+                }
+              }
+            }
+          }
+
+          const breakdownTotal = markedDist + forestDist + pavedDist;
+          let markedPct = 0;
+          let forestPct = 65;
+          let pavedPct = 35;
+
+          if (breakdownTotal > 0) {
+            markedPct = Math.round((markedDist / breakdownTotal) * 100);
+            forestPct = Math.round((forestDist / breakdownTotal) * 100);
+            pavedPct = Math.max(0, 100 - markedPct - forestPct);
+          }
+
+          // Downsample profile points for crisp SVG rendering (~140 points max)
+          const step = Math.max(1, Math.floor(profilePoints.length / 140));
+          const sampled = [];
+          for (let i = 0; i < profilePoints.length; i += step) {
+            sampled.push(profilePoints[i]);
+          }
+          if (sampled[sampled.length - 1] !== profilePoints[profilePoints.length - 1]) {
+            sampled.push(profilePoints[profilePoints.length - 1]);
+          }
+
+          const svgW = 360;
+          const svgTop = 10;
+          const svgBottom = 84;
+          const eleRange = Math.max(10, maxEle - minEle);
+          const maxD = Math.max(0.01, sampled[sampled.length - 1].distKm);
+
+          const svgCoords = sampled.map(p => {
+            const x = (p.distKm / maxD) * svgW;
+            const y = svgBottom - ((p.ele - minEle) / eleRange) * (svgBottom - svgTop);
+            return { ...p, svgX: x, svgY: y };
+          });
+
+          const svgLinePath = svgCoords
+            .map((p, i) => `${i === 0 ? 'M' : 'L'}${p.svgX.toFixed(1)},${p.svgY.toFixed(1)}`)
+            .join(' ');
+          const svgAreaPath = `${svgLinePath} L${svgW},${svgBottom} L0,${svgBottom} Z`;
+
+          const midPt = profilePoints[Math.floor(profilePoints.length / 2)];
+          const midLat = midPt.lat.toFixed(5);
+          const midLon = midPt.lng.toFixed(5);
+
+          return {
+            id: `brouter_${altIdx}_${Math.round(distanceKm * 100)}_${ascentM}`,
+            altIdx,
+            distanceKm,
+            ascentM,
+            descentM,
+            minEle: Math.round(minEle === Infinity ? 0 : minEle),
+            maxEle: Math.round(maxEle === -Infinity ? 0 : maxEle),
+            durationText,
+            breakdown: { markedPct, forestPct, pavedPct },
+            latLngs: rawCoords.map(c => [c[1], c[0]]),
+            rawCoords,
+            sampledProfile: svgCoords,
+            svgLinePath,
+            svgAreaPath,
+            signature: `${Math.round(distanceKm * 50)}_${Math.round(midPt.lat * 1000)}_${Math.round(midPt.lng * 1000)}`,
+            links: {
+              brouter: `https://brouter.de/brouter-web/#map=12/${midLat}/${midLon}/OpenTopoMap&lonlats=${lonlats}&profile=${selectedProfile.value}`,
+              mapy: `https://mapy.com/en/turisticka?planovani-trasy&x=${midLon}&y=${midLat}&z=12`,
+              waymarked: `https://hiking.waymarkedtrails.org/#?map=12.0/${midLat}/${midLon}`
+            }
+          };
+        };
+
+        // Live BRouter Parallel Fetcher (alternativeidx 0, 1, 2)
+        let activeAbortController = null;
+
+        const fetchBRouterRoutes = async (forceLongDistance = false) => {
+          routingError.value = '';
+          longDistanceWarning.value = false;
+          hoverPoint.value = null;
+          clearHoverMarker();
+
+          if (!startStation.value || !endStation.value) {
+            routes.value = [];
+            renderRoutesOnMap();
+            return;
+          }
+
+          if (startStation.value.id === endStation.value.id && viaPoints.value.length === 0) {
+            routes.value = [];
+            renderRoutesOnMap();
+            return;
+          }
+
+          if (!forceLongDistance && straightLineKm.value > 75) {
+            longDistanceWarning.value = true;
+            routes.value = [];
+            renderRoutesOnMap();
+            return;
+          }
+
+          if (activeAbortController) {
+            activeAbortController.abort();
+          }
+          activeAbortController = new AbortController();
+          const { signal } = activeAbortController;
+
+          routingLoading.value = true;
+          const lonlats = buildLonLats();
+
+          try {
+            const indices = [0, 1, 2];
+            const responses = await Promise.allSettled(
+              indices.map(async (idx) => {
+                const url = `https://brouter.de/brouter?lonlats=${encodeURIComponent(lonlats)}&profile=${encodeURIComponent(selectedProfile.value)}&alternativeidx=${idx}&format=geojson`;
+                const res = await fetch(url, { signal });
+                if (!res.ok) {
+                  const errText = await res.text().catch(() => `HTTP ${res.status}`);
+                  throw new Error(errText.slice(0, 140));
+                }
+                const json = await res.json();
+                return parseBRouterFeature(json, idx, lonlats);
+              })
+            );
+
+            if (signal.aborted) return;
+
+            const parsed = [];
+            const seenSignatures = new Set();
+            let firstErr = '';
+
+            for (const item of responses) {
+              if (item.status === 'fulfilled' && item.value) {
+                if (!seenSignatures.has(item.value.signature)) {
+                  seenSignatures.add(item.value.signature);
+                  parsed.push(item.value);
+                }
+              } else if (item.status === 'rejected' && !firstErr) {
+                firstErr = item.reason?.message || 'BRouter request failed';
+              }
+            }
+
+            if (parsed.length === 0) {
+              routes.value = [];
+              routingError.value = firstErr || 'No valid hiking route returned by BRouter for these stations.';
+            } else {
+              routes.value = parsed;
+              selectedRouteIdx.value = 0;
+            }
+
+            renderRoutesOnMap(true);
+          } catch (err) {
+            if (err.name === 'AbortError') return;
+            routes.value = [];
+            routingError.value = err.message || 'Network error while contacting brouter.de';
+            renderRoutesOnMap(false);
+          } finally {
+            if (!signal.aborted) {
+              routingLoading.value = false;
+            }
+          }
+        };
+
+        const routeLongDistanceAnyway = () => {
+          fetchBRouterRoutes(true);
+        };
+
+        // GPX 1.1 Client-Side Generator & Download
+        const downloadGpx = (route) => {
+          const safeName = `${startStation.value?.name || 'Start'}_to_${endStation.value?.name || 'End'}`
+            .replace(/[^a-zA-Z0-9_\-ąćęłńóśźżĄĆĘŁŃÓŚŹŻčďěňřšťůžČĎĚŇŘŠŤŮŽäöüßÄÖÜ]+/g, '_');
+
+          const trkpts = route.rawCoords
+            .map(([lon, lat, ele]) => {
+              const eleTag = typeof ele === 'number' ? `<ele>${ele.toFixed(1)}</ele>` : '';
+              return `      <trkpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}">${eleTag}</trkpt>`;
+            })
+            .join('\n');
+
+          const gpxXml = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Neisse-Nysa-Nisa Rail-to-Trail (BRouter)" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>${startStation.value?.name} to ${endStation.value?.name}</name>
+    <desc>Profile: ${selectedProfile.value} | Distance: ${route.distanceKm.toFixed(1)} km | Ascent: +${route.ascentM} m</desc>
+  </metadata>
+  <trk>
+    <name>${startStation.value?.name} -> ${endStation.value?.name}</name>
+    <trkseg>
+${trkpts}
+    </trkseg>
+  </trk>
+</gpx>`;
+
+          const blob = new Blob([gpxXml], { type: 'application/gpx+xml;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${safeName}_${selectedProfile.value}.gpx`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        };
+
+        // Interactive Elevation Profile Hover -> Live Leaflet Map Marker
+        const onProfileHover = (event, route) => {
+          if (!route.sampledProfile || route.sampledProfile.length === 0) return;
+          const svgEl = event.currentTarget;
+          const rect = svgEl.getBoundingClientRect();
+          const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+          const relX = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+          const targetSvgX = relX * 360;
+
+          let closest = route.sampledProfile[0];
+          let bestDiff = Infinity;
+          for (const pt of route.sampledProfile) {
+            const diff = Math.abs(pt.svgX - targetSvgX);
+            if (diff < bestDiff) {
+              bestDiff = diff;
+              closest = pt;
+            }
+          }
+
+          hoverPoint.value = closest;
+          updateHoverMarker(closest);
+        };
+
+        const clearProfileHover = () => {
+          hoverPoint.value = null;
+          clearHoverMarker();
+        };
+
+        // Leaflet Map & Layers
+        let map = null;
+        let waymarkedLayer = null;
+        let railLayerGroup = null;
+        let routesLayerGroup = null;
+        let stationsLayerGroup = null;
+        let viaLayerGroup = null;
+        let hoverMarker = null;
+
+        const updateHoverMarker = (pt) => {
+          if (!map || !pt) return;
+          if (!hoverMarker) {
+            hoverMarker = L.circleMarker([pt.lat, pt.lng], {
+              radius: 7,
+              color: '#ffffff',
+              weight: 2.5,
+              fillColor: '#e11d48',
+              fillOpacity: 1
+            }).addTo(map);
+          } else {
+            hoverMarker.setLatLng([pt.lat, pt.lng]);
+          }
+        };
+
+        const clearHoverMarker = () => {
+          if (hoverMarker && map) {
+            map.removeLayer(hoverMarker);
+            hoverMarker = null;
+          }
+        };
+
+        const initMap = () => {
+          map = L.map('map', {
+            center: [50.94, 15.65],
+            zoom: 12,
+            zoomControl: true
+          });
+
+          // Exclusive OpenTopoMap Base Layer
+          L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            maxZoom: 17,
+            attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, SRTM | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'
+          }).addTo(map);
+
+          // Waymarked Trails Hiking Overlay (Enabled BY DEFAULT)
+          waymarkedLayer = L.tileLayer('https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            opacity: 0.85,
+            attribution: '&copy; <a href="https://hiking.waymarkedtrails.org">Waymarked Trails</a>'
+          });
+          if (showWaymarkedOverlay.value) {
+            waymarkedLayer.addTo(map);
+          }
+
+          railLayerGroup = L.layerGroup().addTo(map);
+          routesLayerGroup = L.layerGroup().addTo(map);
+          viaLayerGroup = L.layerGroup().addTo(map);
+          stationsLayerGroup = L.layerGroup().addTo(map);
+
+          // Map Click for Via-Points (Toggle mode OR Shift+Click)
+          map.on('click', (e) => {
+            if (addingViaPoint.value || e.originalEvent.shiftKey) {
+              viaPoints.value.push({
+                id: Date.now() + Math.random(),
+                lat: e.latlng.lat,
+                lng: e.latlng.lng
+              });
+              addingViaPoint.value = false;
+            }
+          });
+
+          renderRailCorridors();
+          renderStationsOnMap();
+        };
+
+        const toggleWaymarkedLayer = () => {
+          if (!map) return;
+          if (showWaymarkedOverlay.value) waymarkedLayer.addTo(map);
+          else map.removeLayer(waymarkedLayer);
+        };
+
+        const renderRailCorridors = () => {
+          if (!railLayerGroup) return;
+          railLayerGroup.clearLayers();
+
+          for (const line of railLines) {
+            const coords = line.stationIds
+              .map(id => stations.value.find(s => s.id === id))
+              .filter(Boolean)
+              .map(s => [s.lat, s.lng]);
+
+            if (coords.length > 1) {
+              const baseColor = line.operator === 'TRILEX' ? '#047857' : (line.operator === 'CD' ? '#0369a1' : '#141416');
+              L.polyline(coords, {
+                color: baseColor,
+                weight: 3.5,
+                opacity: 0.55
+              }).addTo(railLayerGroup);
+
+              L.polyline(coords, {
+                color: line.operator === 'KD' ? '#facc15' : '#ffffff',
+                weight: 1.4,
+                dashArray: '5, 7',
+                opacity: 0.85
+              }).bindTooltip(line.name, { sticky: true }).addTo(railLayerGroup);
+            }
+          }
+        };
+
+        const renderStationsOnMap = () => {
+          if (!stationsLayerGroup) return;
+          stationsLayerGroup.clearLayers();
+
+          for (const st of stations.value) {
+            const isStart = startStation.value && startStation.value.id === st.id;
+            const isEnd = endStation.value && endStation.value.id === st.id;
+
+            let opClass = 'op-kd';
+            if (st.operator === 'CD') opClass = 'op-cd';
+            else if (st.operator === 'TRILEX') opClass = 'op-trilex';
+
+            let pinClass = `station-pin ${opClass}`;
+            let label = st.country;
+            let zIndexOffset = 0;
+
+            if (isStart && isEnd) {
+              pinClass += ' is-both';
+              label = 'A/B';
+              zIndexOffset = 1000;
+            } else if (isStart) {
+              pinClass += ' is-start';
+              label = 'A';
+              zIndexOffset = 900;
+            } else if (isEnd) {
+              pinClass += ' is-end';
+              label = 'B';
+              zIndexOffset = 900;
+            }
+
+            const icon = L.divIcon({
+              className: 'station-marker-wrapper',
+              html: `<div class="${pinClass}" title="${st.name} (${st.operator})">${label}</div>`,
+              iconSize: [30, 30],
+              iconAnchor: [15, 15]
+            });
+
+            const marker = L.marker([st.lat, st.lng], { icon, zIndexOffset });
+
+            const popupDiv = document.createElement('div');
+            popupDiv.className = 'p-1 min-w-[210px] font-sans';
+            popupDiv.innerHTML = `
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-obsidian text-gold border border-gold/30">${st.country} • ${st.operator}</span>
+                <span class="text-[10px] text-zinc-400 font-mono">${st.lines.join(', ')}</span>
+              </div>
+              <div class="font-bold text-sm text-white mb-2">${st.name}</div>
+              <div class="flex gap-1.5">
+                <button id="btn-start-${st.id}" class="flex-1 px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold transition">
+                  ${t('popupMakeStart')}
+                </button>
+                <button id="btn-end-${st.id}" class="flex-1 px-2 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-semibold transition">
+                  ${t('popupMakeEnd')}
+                </button>
+              </div>
+            `;
+
+            marker.bindPopup(popupDiv);
+            marker.on('popupopen', () => {
+              const btnStart = document.getElementById(`btn-start-${st.id}`);
+              const btnEnd = document.getElementById(`btn-end-${st.id}`);
+              if (btnStart) {
+                btnStart.onclick = () => {
+                  startStationId.value = st.id;
+                  map.closePopup();
+                };
+              }
+              if (btnEnd) {
+                btnEnd.onclick = () => {
+                  endStationId.value = st.id;
+                  map.closePopup();
+                };
+              }
+            });
+
+            marker.addTo(stationsLayerGroup);
+          }
+        };
+
+        const renderViaPointsOnMap = () => {
+          if (!viaLayerGroup) return;
+          viaLayerGroup.clearLayers();
+
+          viaPoints.value.forEach((vp, idx) => {
+            const icon = L.divIcon({
+              className: 'station-marker-wrapper',
+              html: `<div class="via-pin" title="Via ${idx + 1}">${idx + 1}</div>`,
+              iconSize: [24, 24],
+              iconAnchor: [12, 12]
+            });
+
+            const m = L.marker([vp.lat, vp.lng], { icon, zIndexOffset: 800 });
+            m.bindTooltip(`Via ${idx + 1} (click to remove)`);
+            m.on('click', () => removeViaPoint(vp.id));
+            m.addTo(viaLayerGroup);
+          });
+        };
+
+        const renderRoutesOnMap = (fitToActive = false) => {
+          if (!routesLayerGroup || !map) return;
+          routesLayerGroup.clearLayers();
+
+          // Render inactive alternatives first so the selected route sits cleanly on top
+          routes.value.forEach((route, idx) => {
+            if (idx === selectedRouteIdx.value) return;
+            const altColor = routeColors[idx] || '#2563eb';
+            const poly = L.polyline(route.latLngs, {
+              color: altColor,
+              weight: 4,
+              opacity: 0.65,
+              dashArray: '8, 7',
+              lineCap: 'round',
+              lineJoin: 'round'
+            });
+            poly.bindTooltip(
+              `${t('alternativeRouteLabel', { n: idx })}: <strong>${route.distanceKm.toFixed(1)} km</strong> (+${route.ascentM} m)`,
+              { sticky: true }
+            );
+            poly.on('click', () => selectRoute(idx));
+            poly.addTo(routesLayerGroup);
+          });
+
+          // Render active selected route with high-contrast white casing
+          const active = routes.value[selectedRouteIdx.value];
+          if (active) {
+            const activeColor = routeColors[selectedRouteIdx.value] || '#e11d48';
+            // White casing
+            L.polyline(active.latLngs, {
+              color: '#ffffff',
+              weight: 8.5,
+              opacity: 0.9,
+              lineCap: 'round',
+              lineJoin: 'round'
+            }).addTo(routesLayerGroup);
+
+            // Vivid foreground line
+            const mainPoly = L.polyline(active.latLngs, {
+              color: activeColor,
+              weight: 5,
+              opacity: 1,
+              lineCap: 'round',
+              lineJoin: 'round'
+            });
+            mainPoly.bindTooltip(
+              `<strong>${active.distanceKm.toFixed(1)} km</strong> • +${active.ascentM} m • ⏱ ${active.durationText}`,
+              { sticky: true }
+            );
+            mainPoly.addTo(routesLayerGroup);
+
+            if (fitToActive && active.latLngs.length > 1) {
+              map.fitBounds(L.latLngBounds(active.latLngs), { padding: [55, 55], maxZoom: 14 });
+            }
+          }
+        };
+
+        // UI Actions
+        const setLanguage = (code) => {
+          lang.value = code;
+          renderStationsOnMap();
+          renderRoutesOnMap(false);
+        };
+
+        const selectRoute = (idx) => {
+          selectedRouteIdx.value = idx;
+          hoverPoint.value = null;
+          clearHoverMarker();
+          renderRoutesOnMap(true);
+        };
+
+        const swapStations = () => {
+          if (!startStationId.value || !endStationId.value) return;
+          const tmp = startStationId.value;
+          startStationId.value = endStationId.value;
+          endStationId.value = tmp;
+          viaPoints.value = [...viaPoints.value].reverse();
+        };
+
+        const removeViaPoint = (id) => {
+          viaPoints.value = viaPoints.value.filter(v => v.id !== id);
+        };
+
+        const clearViaPoints = () => {
+          viaPoints.value = [];
+        };
+
+        const applyPreset = (preset) => {
+          selectedOperator.value = 'ALL';
+          viaPoints.value = [];
+          startStationId.value = preset.start;
+          endStationId.value = preset.end;
+        };
+
+        // Reactive Watchers
+        watch([startStationId, endStationId], () => {
+          renderStationsOnMap();
+          fetchBRouterRoutes(false);
+        });
+
+        watch(selectedProfile, () => {
+          fetchBRouterRoutes(false);
+        });
+
+        watch(viaPoints, () => {
+          renderViaPointsOnMap();
+          fetchBRouterRoutes(false);
+        }, { deep: true });
+
+        watch(activeView, (val) => {
+          if (val === 'map' && map) {
+            nextTick(() => map.invalidateSize());
+          }
+        });
+
+        onMounted(() => {
+          initMap();
+          fetchBRouterRoutes(false);
+        });
+
+        return {
+          lang,
+          languages,
+          setLanguage,
+          t,
+          activeView,
+          operatorFilters,
+          selectedOperator,
+          presets,
+          applyPreset,
+          stations,
+          filteredStations,
+          startStationId,
+          endStationId,
+          startStation,
+          endStation,
+          swapStations,
+          selectedProfile,
+          addingViaPoint,
+          viaPoints,
+          removeViaPoint,
+          clearViaPoints,
+          straightLineKm,
+          ticketHint,
+          routingLoading,
+          routingError,
+          longDistanceWarning,
+          routeLongDistanceAnyway,
+          fallbackExternalLinks,
+          fetchBRouterRoutes,
+          routes,
+          selectedRouteIdx,
+          selectRoute,
+          routeColors,
+          hoverPoint,
+          onProfileHover,
+          clearProfileHover,
+          downloadGpx,
+          showWaymarkedOverlay,
+          toggleWaymarkedLayer
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
