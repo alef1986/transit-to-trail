@@ -60,7 +60,6 @@
     <main class="workspace" v-show="activeTab === 'map'">
       <aside class="sidebar">
         <div class="controls-block">
-          <!-- Regions & Operator Dropdowns -->
           <div class="grid-2">
             <div class="field">
               <label class="field-label">{{ t.regionLabel }}</label>
@@ -83,7 +82,6 @@
             </div>
           </div>
 
-          <!-- Station A & B -->
           <div class="station-row">
             <div class="field">
               <label class="field-label"><span class="dot dot-a"></span> {{ t.startStation }}</label>
@@ -105,7 +103,6 @@
             </select>
           </div>
 
-          <!-- Profile & Via-point -->
           <div class="toolbar-row">
             <div class="segmented">
               <button class="seg-btn" :class="{ active: profile === 'hiking-mountain' }" @click="profile = 'hiking-mountain'">
@@ -129,7 +126,6 @@
           </div>
         </div>
 
-        <!-- Results Header -->
         <div class="results-header">
           <span>{{ t.routesHeader }}</span>
           <span class="status-pill" :class="{ loading: routingStatus === 'loading', error: routingStatus === 'error' }">
@@ -137,7 +133,6 @@
           </span>
         </div>
 
-        <!-- Scrollable Route Cards -->
         <div class="results-list">
           <div v-if="routingStatus === 'too-far'" class="empty-state">{{ t.tooFarMsg }}</div>
           <div v-else-if="routingStatus === 'same-station'" class="empty-state">{{ t.sameStationMsg }}</div>
@@ -189,7 +184,6 @@
               <span>● {{ t.surfPaved }} {{ rt.surfaces.pavedPct }}%</span>
             </div>
 
-            <!-- Official NGO-marked trails used in this corridor (shown on active route when markedPct >= 15%) -->
             <div class="inspired-box" v-if="activeRouteIdx === idx && inspiredTrails.length" @click.stop>
               <div class="inspired-label">{{ t.inspiredByLabel }}</div>
               <div class="inspired-chips">
@@ -269,13 +263,148 @@
       </section>
     </main>
 
-    <!-- Data, Socio-Tech Model & University Pitch -->
+    <!-- Data, Socio-Tech Model, Interactive Stakeholder Ecosystem & University Pitch -->
     <section class="model-view" v-show="activeTab === 'model'">
       <div class="model-container">
         <div class="hero-card">
           <div class="hero-kicker">{{ t.modelKicker }}</div>
           <h2>{{ t.modelHeroTitle }}</h2>
           <p>{{ t.modelHeroText }}</p>
+        </div>
+
+        <!-- Interactive Stakeholder Ecosystem Map -->
+        <div class="stakeholder-card">
+          <div class="stakeholder-top">
+            <div>
+              <h3 class="section-title" style="margin-bottom: 2px;">🧭 {{ t.stakeTitle }}</h3>
+              <p class="stakeholder-intro">{{ t.stakeIntro }}</p>
+            </div>
+            <div class="phase-switcher">
+              <button class="phase-btn" :class="{ active: lifecyclePhase === 'pilot' }" @click="lifecyclePhase = 'pilot'">
+                {{ t.phasePilot }}
+              </button>
+              <button class="phase-btn" :class="{ active: lifecyclePhase === 'ops' }" @click="lifecyclePhase = 'ops'">
+                {{ t.phaseOps }}
+              </button>
+            </div>
+          </div>
+
+          <div class="stakeholder-layout">
+            <!-- Left: Interactive Radial SVG Network -->
+            <div class="ecosystem-canvas">
+              <svg class="ecosystem-svg" viewBox="0 0 560 400" xmlns="http://www.w3.org/2000/svg">
+                <!-- Subtle orbit ring -->
+                <ellipse cx="280" cy="200" rx="192" ry="144" fill="none" stroke="rgba(212,175,55,0.16)" stroke-width="1.2" stroke-dasharray="4,5" />
+
+                <!-- Spokes from center to each stakeholder -->
+                <line
+                  v-for="st in stakeholders"
+                  :key="'line-' + st.id"
+                  x1="280"
+                  y1="200"
+                  :x2="st.x"
+                  :y2="st.y"
+                  :stroke="selectedStakeholderId === st.id ? '#d4af37' : 'rgba(255,255,255,0.16)'"
+                  :stroke-width="selectedStakeholderId === st.id ? 2.4 : 1.2"
+                  :stroke-dasharray="selectedStakeholderId === st.id ? '' : '3,3'"
+                />
+
+                <!-- Center Boundary Object Hub -->
+                <g>
+                  <rect x="212" y="172" width="136" height="56" rx="12" fill="#1e1f24" stroke="#d4af37" stroke-width="2" />
+                  <text x="280" y="196" text-anchor="middle" fill="#d4af37" font-size="12" font-weight="700">
+                    {{ t.ecoCenterTop }}
+                  </text>
+                  <text x="280" y="213" text-anchor="middle" fill="#cbd5e1" font-size="10">
+                    {{ t.ecoCenterBot }}
+                  </text>
+                </g>
+
+                <!-- 8 Interactive Stakeholder Nodes -->
+                <g
+                  v-for="st in stakeholders"
+                  :key="st.id"
+                  class="eco-node"
+                  @click="selectedStakeholderId = st.id"
+                >
+                  <rect
+                    class="eco-node-rect"
+                    :x="st.x - 69"
+                    :y="st.y - 21"
+                    width="138"
+                    height="42"
+                    rx="9"
+                    :fill="selectedStakeholderId === st.id ? '#2a2618' : '#1e1f24'"
+                    :stroke="selectedStakeholderId === st.id ? '#d4af37' : getStakeholderNodeMeta(st).color"
+                    :stroke-width="selectedStakeholderId === st.id ? 2.4 : 1.4"
+                  />
+                  <!-- Effort indicator dot -->
+                  <circle
+                    :cx="st.x - 55"
+                    :cy="st.y"
+                    r="5"
+                    :fill="getStakeholderNodeMeta(st).color"
+                  />
+                  <text
+                    :x="st.x - 43"
+                    :y="st.y + 4"
+                    fill="#f8fafc"
+                    font-size="11"
+                    font-weight="600"
+                  >
+                    {{ getStakeholderNodeMeta(st).short }}
+                  </text>
+                </g>
+              </svg>
+
+              <div class="eco-legend">
+                <span><span class="effort-dot" style="background:#ef4444"></span>{{ t.effortHigh }}</span>
+                <span><span class="effort-dot" style="background:#f59e0b"></span>{{ t.effortMedium }}</span>
+                <span><span class="effort-dot" style="background:#22c55e"></span>{{ t.effortLow }}</span>
+                <span><span class="effort-dot" style="background:#38bdf8"></span>{{ t.effortPassive }}</span>
+              </div>
+            </div>
+
+            <!-- Right: Dynamic Stakeholder Inspector -->
+            <div class="inspector-panel">
+              <div class="inspector-head">
+                <div>
+                  <h4 class="inspector-title">{{ selectedStakeholder.title }}</h4>
+                  <span class="inspector-role" :class="{ 'co-user': selectedStakeholder.isCoUser }">
+                    {{ selectedStakeholder.role }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="effort-box">
+                <div class="effort-top">
+                  <span>{{ t.effortLabel }}</span>
+                  <span :style="{ color: selectedStakeholder.effortColor }">{{ selectedStakeholder.effortLabel }}</span>
+                </div>
+                <div class="effort-meter">
+                  <div
+                    class="effort-fill"
+                    :style="{ width: selectedStakeholder.effortPct + '%', backgroundColor: selectedStakeholder.effortColor }"
+                  ></div>
+                </div>
+              </div>
+
+              <div class="inspector-block">
+                <h4>{{ t.lblContribute }}</h4>
+                <p>{{ selectedStakeholder.contributeText }}</p>
+              </div>
+
+              <div class="inspector-block">
+                <h4>{{ t.lblGain }}</h4>
+                <p>{{ selectedStakeholder.gain }}</p>
+              </div>
+
+              <div class="avoid-box">
+                <h4>✓ {{ t.lblAvoid }}</h4>
+                <p>{{ selectedStakeholder.avoid }}</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- University Pitch & EU Grant Case -->

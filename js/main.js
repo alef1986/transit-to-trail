@@ -2,6 +2,7 @@ import { createApp, ref, computed, watch, onMounted, nextTick } from 'https://un
 import { STATIONS } from './data/stations.js';
 import { RAIL_CORRIDORS } from './data/railLines.js';
 import { REGION_PRESETS } from './data/presets.js';
+import { STAKEHOLDERS, EFFORT_STYLE } from './data/stakeholders.js';
 import { I18N } from './i18n.js';
 import { fetchBRouterAlternatives, haversineKm, formatDuration } from './services/brouter.js';
 import { fetchCorridorTrails } from './services/waymarked.js';
@@ -35,6 +36,10 @@ createApp({
     const inspiredTrails = ref([]);
     const hoverInfo = ref(null);
 
+    // Stakeholder Map State
+    const lifecyclePhase = ref('pilot'); // 'pilot' | 'ops'
+    const selectedStakeholderId = ref('university');
+
     let map = null;
     let waymarkedLayer = null;
     let railLayerGroup = null;
@@ -47,7 +52,40 @@ createApp({
 
     const t = computed(() => I18N[lang.value] || I18N.en);
     const presets = REGION_PRESETS;
+    const stakeholders = STAKEHOLDERS;
     const stationMap = new Map(STATIONS.map((s) => [s.id, s]));
+
+    const selectedStakeholder = computed(() => {
+      const st = STAKEHOLDERS.find((s) => s.id === selectedStakeholderId.value) || STAKEHOLDERS[0];
+      const loc = st.i18n[lang.value] || st.i18n.en;
+      const effKey = st.effort[lifecyclePhase.value];
+      const effStyle = EFFORT_STYLE[effKey] || EFFORT_STYLE.low;
+      const effLabels = {
+        high: t.value.effortHigh,
+        medium: t.value.effortMedium,
+        low: t.value.effortLow,
+        passive: t.value.effortPassive
+      };
+      return {
+        ...st,
+        ...loc,
+        contributeText: loc.contribute[lifecyclePhase.value],
+        effortKey: effKey,
+        effortPct: effStyle.pct,
+        effortColor: effStyle.color,
+        effortLabel: effLabels[effKey] || ''
+      };
+    });
+
+    function getStakeholderNodeMeta(st) {
+      const loc = st.i18n[lang.value] || st.i18n.en;
+      const effKey = st.effort[lifecyclePhase.value];
+      const effStyle = EFFORT_STYLE[effKey] || EFFORT_STYLE.low;
+      return {
+        short: loc.short,
+        color: effStyle.color
+      };
+    }
 
     const filteredStations = computed(() => {
       if (operatorFilter.value === 'ALL') return STATIONS;
@@ -120,7 +158,6 @@ createApp({
       inspiredTrails.value = [];
 
       const rt = activeRoute.value;
-      // Only attribute NGO-marked trails if a meaningful share (>= 15%) of the route uses them
       if (!rt || !rt.coords?.length || (rt.surfaces?.markedPct ?? 0) < 15) {
         return;
       }
@@ -142,7 +179,6 @@ createApp({
           .map((s) => [s.lat, s.lon]);
         if (latlngs.length < 2) continue;
 
-        // 1. Crisp white outer halo for visibility over topographic relief
         L.polyline(latlngs, {
           color: '#ffffff',
           weight: 6.5,
@@ -150,7 +186,6 @@ createApp({
           interactive: false
         }).addTo(railLayerGroup);
 
-        // 2. Dark railway track casing
         L.polyline(latlngs, {
           color: '#141416',
           weight: 4,
@@ -158,7 +193,6 @@ createApp({
           interactive: false
         }).addTo(railLayerGroup);
 
-        // 3. Operator-colored dashed inner line (classic rail style)
         const dashLine = L.polyline(latlngs, {
           color: OP_DASH_COLORS[corr.operator] || '#facc15',
           weight: 2.2,
@@ -196,7 +230,6 @@ createApp({
           continue;
         }
 
-        // White outer halo for strong separation from OpenTopoMap background
         L.circleMarker([st.lat, st.lon], {
           radius: 8.5,
           fillColor: '#ffffff',
@@ -265,7 +298,6 @@ createApp({
         const latlngs = rt.coords.map(([lon, lat]) => [lat, lon]);
 
         if (isActive) {
-          // Crisp white halo under active route
           L.polyline(latlngs, {
             color: '#ffffff',
             weight: 8.5,
@@ -473,6 +505,11 @@ createApp({
       inspiredTrails,
       hoverInfo,
       elevSvg,
+      lifecyclePhase,
+      selectedStakeholderId,
+      stakeholders,
+      selectedStakeholder,
+      getStakeholderNodeMeta,
       t,
       presets,
       filteredStations,

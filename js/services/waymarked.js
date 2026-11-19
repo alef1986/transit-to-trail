@@ -40,10 +40,6 @@ function getRouteBbox(coords) {
   return [minLon, minLat, maxLon, maxLat];
 }
 
-/**
- * Fetches official OSM/Waymarked Trails routes present in the tight bounding box
- * of a generated route. Returns up to 4 most relevant named routes with direct links.
- */
 export async function fetchCorridorTrails(coords, signal) {
   if (!coords || coords.length < 2) return [];
   const [minLon, minLat, maxLon, maxLat] = getRouteBbox(coords);
@@ -60,7 +56,6 @@ export async function fetchCorridorTrails(coords, signal) {
     const data = await res.json();
     const raw = Array.isArray(data?.results) ? data.results : [];
 
-    // Filter to routes with meaningful names/refs and deduplicate
     const seen = new Set();
     const cleaned = [];
     for (const item of raw) {
@@ -69,7 +64,6 @@ export async function fetchCorridorTrails(coords, signal) {
       if (!label) continue;
       seen.add(item.id);
 
-      // Prefer local/regional/national named trails over generic unnamed refs
       const groupRank = { lwn: 1, rwn: 2, nwn: 3, iwn: 4 }[item.group] || 5;
       cleaned.push({
         id: item.id,
